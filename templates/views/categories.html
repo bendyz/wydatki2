@@ -1,0 +1,38 @@
+<!-- Categories View -->
+<div id="view-categories" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+  <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Kategorie</h1>
+      <p class="text-gray-600">Zarządzaj kategoriami wydatków</p>
+    </div>
+    <button onclick="showAddCategoryForm()" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto">
+      <i class="fas fa-plus mr-2"></i>Nowa kategoria
+    </button>
+  </div>
+
+  <div id="add-category-form" class="hidden bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <input type="text" id="new-category-name" class="flex-1 border rounded-md px-3 py-2" placeholder="Nazwa kategorii" />
+      <button onclick="addCategory()" class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">Dodaj</button>
+      <button onclick="hideAddCategoryForm()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto">Anuluj</button>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="categories-list" class="divide-y divide-gray-200">
+          <tr>
+            <td colspan="2" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,1843 @@
+<!doctype html>
+<html lang="pl">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Wydatki 2.0 - AI Expense Manager</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: "#3b82f6",
+                            secondary: "#64748b",
+                            success: "#22c55e",
+                            danger: "#ef4444",
+                            warning: "#f59e0b",
+                        },
+                    },
+                },
+            };
+        </script>
+        <style>
+            .view {
+                display: none !important;
+            }
+            .view.active {
+                display: block !important;
+            }
+            .drag-over {
+                border-color: #3b82f6 !important;
+                background-color: #eff6ff !important;
+            }
+            .fade-in {
+                animation: fadeIn 0.3s ease-in;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        <!-- Navigation -->
+        <nav id="navbar" class="bg-white shadow-sm border-b hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-wallet text-primary text-2xl mr-3"></i>
+                        <span class="font-bold text-xl text-gray-800"
+                            >Wydatki 2.0</span
+                        >
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button
+                            onclick="showView('dashboard')"
+                            class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100"
+                        >
+                            <i class="fas fa-chart-pie mr-1"></i> Dashboard
+                        </button>
+                        <button
+                            onclick="showView('add-expense')"
+                            class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100"
+                        >
+                            <i class="fas fa-plus mr-1"></i> Dodaj wydatek
+                        </button>
+                        <button
+                            onclick="showView('categories')"
+                            class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100"
+                        >
+                            <i class="fas fa-tags mr-1"></i> Kategorie
+                        </button>
+                        <button
+                            onclick="showView('subscriptions')"
+                            class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100"
+                        >
+                            <i class="fas fa-sync mr-1"></i> Abonamenty
+                        </button>
+                        <button
+                            onclick="showView('stats')"
+                            class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100"
+                        >
+                            <i class="fas fa-chart-bar mr-1"></i> Statystyki
+                        </button>
+                        <button
+                            onclick="logout()"
+                            class="px-3 py-2 rounded-md text-sm font-medium text-danger hover:bg-red-50"
+                        >
+                            <i class="fas fa-sign-out-alt mr-1"></i> Wyloguj
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Login View -->
+        <div
+            id="view-login"
+            class="view active flex items-center justify-center min-h-screen"
+        >
+            <div
+                class="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg"
+            >
+                <div class="text-center">
+                    <i class="fas fa-wallet text-primary text-5xl mb-4"></i>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        Wydatki 2.0
+                    </h2>
+                    <p class="mt-2 text-gray-600">
+                        Zarządzaj wydatkami z pomocą AI
+                    </p>
+                </div>
+
+                <div class="mt-8 space-y-6">
+                    <div id="login-form">
+                        <div class="rounded-md shadow-sm -space-y-px">
+                            <div>
+                                <input
+                                    id="login-email"
+                                    type="email"
+                                    required
+                                    class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                                    placeholder="Email"
+                                />
+                            </div>
+                            <div>
+                                <input
+                                    id="login-password"
+                                    type="password"
+                                    required
+                                    class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                                    placeholder="Hasło"
+                                />
+                            </div>
+                        </div>
+                        <button
+                            onclick="login()"
+                            class="mt-4 group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        >
+                            Zaloguj się
+                        </button>
+                        <p class="mt-2 text-center text-sm text-gray-600">
+                            Nie masz konta?
+                            <a
+                                href="#"
+                                onclick="toggleAuthMode()"
+                                class="font-medium text-primary hover:text-blue-500"
+                                >Zarejestruj się</a
+                            >
+                        </p>
+                    </div>
+
+                    <div id="register-form" class="hidden">
+                        <div class="rounded-md shadow-sm -space-y-px">
+                            <div>
+                                <input
+                                    id="reg-email"
+                                    type="email"
+                                    required
+                                    class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                                    placeholder="Email"
+                                />
+                            </div>
+                            <div>
+                                <input
+                                    id="reg-fullname"
+                                    type="text"
+                                    class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                                    placeholder="Imię i nazwisko (opcjonalne)"
+                                />
+                            </div>
+                            <div>
+                                <input
+                                    id="reg-password"
+                                    type="password"
+                                    required
+                                    class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                                    placeholder="Hasło (min. 6 znaków)"
+                                />
+                            </div>
+                        </div>
+                        <button
+                            onclick="register()"
+                            class="mt-4 group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        >
+                            Zarejestruj się
+                        </button>
+                        <p class="mt-2 text-center text-sm text-gray-600">
+                            Masz już konto?
+                            <a
+                                href="#"
+                                onclick="toggleAuthMode()"
+                                class="font-medium text-primary hover:text-blue-500"
+                                >Zaloguj się</a
+                            >
+                        </p>
+                    </div>
+                </div>
+                <div
+                    id="auth-error"
+                    class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm"
+                ></div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div
+            id="view-dashboard"
+            class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p class="text-gray-600">Przegląd Twoich wydatków</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-blue-100 text-primary">
+                            <i class="fas fa-money-bill-wave text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">
+                                Ten miesiąc
+                            </p>
+                            <p
+                                id="stat-month-total"
+                                class="text-2xl font-bold text-gray-900"
+                            >
+                                -
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-green-100 text-success">
+                            <i class="fas fa-receipt text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">
+                                Liczba wydatków
+                            </p>
+                            <p
+                                id="stat-count"
+                                class="text-2xl font-bold text-gray-900"
+                            >
+                                -
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div
+                            class="p-3 rounded-full bg-yellow-100 text-warning"
+                        >
+                            <i class="fas fa-sync text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">
+                                Aktywne abonamenty
+                            </p>
+                            <p
+                                id="stat-subs"
+                                class="text-2xl font-bold text-gray-900"
+                            >
+                                -
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-white rounded-lg shadow mb-6 p-4">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Od</label
+                        >
+                        <input
+                            type="date"
+                            id="filter-start"
+                            class="border rounded-md px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Do</label
+                        >
+                        <input
+                            type="date"
+                            id="filter-end"
+                            class="border rounded-md px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Kategoria</label
+                        >
+                        <select
+                            id="filter-category"
+                            class="border rounded-md px-3 py-2 text-sm"
+                        >
+                            <option value="">Wszystkie</option>
+                        </select>
+                    </div>
+                    <button
+                        onclick="loadExpenses()"
+                        class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700"
+                    >
+                        <i class="fas fa-filter mr-1"></i> Filtruj
+                    </button>
+                </div>
+            </div>
+
+            <!-- Expenses Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                                Data
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                                Opis
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                                Kategoria
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                                Kwota
+                            </th>
+                            <th
+                                class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                                Akcje
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        id="expenses-list"
+                        class="bg-white divide-y divide-gray-200"
+                    >
+                        <tr>
+                            <td
+                                colspan="5"
+                                class="px-6 py-4 text-center text-gray-500"
+                            >
+                                Wczytywanie...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Add Expense View -->
+        <div
+            id="view-add-expense"
+            class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Dodaj wydatek</h1>
+                <p class="text-gray-600">Wybierz sposób dodawania</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex">
+                        <button
+                            onclick="showExpenseTab('manual')"
+                            id="tab-manual"
+                            class="w-1/3 py-4 px-1 text-center border-b-2 border-primary text-primary font-medium text-sm"
+                        >
+                            <i class="fas fa-keyboard mr-2"></i>Ręcznie
+                        </button>
+                        <button
+                            onclick="showExpenseTab('receipt')"
+                            id="tab-receipt"
+                            class="w-1/3 py-4 px-1 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm"
+                        >
+                            <i class="fas fa-camera mr-2"></i>Zdjęcie paragonu
+                        </button>
+                        <button
+                            onclick="showExpenseTab('text')"
+                            id="tab-text"
+                            class="w-1/3 py-4 px-1 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm"
+                        >
+                            <i class="fas fa-comment mr-2"></i>Opis tekstowy
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Manual Form -->
+                <div id="expense-tab-manual" class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Kwota</label
+                            >
+                            <input
+                                type="number"
+                                step="0.01"
+                                id="manual-amount"
+                                class="w-full border rounded-md px-3 py-2"
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Data</label
+                            >
+                            <input
+                                type="date"
+                                id="manual-date"
+                                class="w-full border rounded-md px-3 py-2"
+                            />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Opis / Sklep</label
+                            >
+                            <input
+                                type="text"
+                                id="manual-description"
+                                class="w-full border rounded-md px-3 py-2"
+                                placeholder="np. Biedronka, Netflix..."
+                            />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Kategoria</label
+                            >
+                            <select
+                                id="manual-category"
+                                class="w-full border rounded-md px-3 py-2"
+                            >
+                                <option value="">-- wybierz --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <button
+                            onclick="addManualExpense()"
+                            class="bg-primary text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                        >
+                            <i class="fas fa-save mr-2"></i>Zapisz wydatek
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Receipt Upload -->
+                <div id="expense-tab-receipt" class="p-6 hidden">
+                    <div
+                        id="receipt-upload-area"
+                        class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-primary transition-colors"
+                    >
+                        <i
+                            class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"
+                        ></i>
+                        <p class="text-lg font-medium text-gray-700">
+                            Przeciągnij zdjęcie paragonu tutaj
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            lub kliknij, aby wybrać plik
+                        </p>
+                        <input
+                            type="file"
+                            id="receipt-file-input"
+                            accept="image/*"
+                            class="hidden"
+                        />
+                    </div>
+                    <div id="receipt-preview" class="hidden mt-4">
+                        <img
+                            id="receipt-preview-img"
+                            class="max-h-64 mx-auto rounded-lg shadow"
+                        />
+                        <div class="mt-4 flex justify-center">
+                            <button
+                                onclick="analyzeReceipt()"
+                                class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700"
+                            >
+                                <i class="fas fa-brain mr-2"></i>Analizuj przez
+                                AI
+                            </button>
+                        </div>
+                    </div>
+                    <div id="receipt-loading" class="hidden mt-4 text-center">
+                        <i
+                            class="fas fa-spinner fa-spin text-3xl text-primary"
+                        ></i>
+                        <p class="mt-2 text-gray-600">
+                            AI analizuje paragon...
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Text Input -->
+                <div id="expense-tab-text" class="p-6 hidden">
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Opisz wydatek</label
+                        >
+                        <textarea
+                            id="text-expense-input"
+                            rows="4"
+                            class="w-full border rounded-md px-3 py-2"
+                            placeholder="np. Wczoraj wydałem 10zł w żabce na batonika i wodę..."
+                        ></textarea>
+                        <p class="text-xs text-gray-500 mt-1">
+                            AI rozpozna kwotę, datę, sklep i kategorię.
+                        </p>
+                    </div>
+                    <div class="mt-4">
+                        <button
+                            onclick="analyzeTextExpense()"
+                            class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700"
+                        >
+                            <i class="fas fa-brain mr-2"></i>Analizuj przez AI
+                        </button>
+                    </div>
+                    <div id="text-loading" class="hidden mt-4 text-center">
+                        <i
+                            class="fas fa-spinner fa-spin text-3xl text-primary"
+                        ></i>
+                        <p class="mt-2 text-gray-600">AI analizuje opis...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Draft Review Panel -->
+            <div
+                id="draft-panel"
+                class="hidden bg-white rounded-lg shadow p-6 fade-in"
+            >
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-robot text-primary text-xl mr-2"></i>
+                    <h2 class="text-lg font-bold text-gray-900">
+                        Propozycja AI – sprawdź przed zapisaniem
+                    </h2>
+                </div>
+
+                <!-- Duplicate Warnings -->
+                <div
+                    id="draft-duplicates"
+                    class="hidden mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md"
+                >
+                    <h3 class="font-medium text-yellow-800 mb-2">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        Ostrzeżenie o duplikacie
+                    </h3>
+                    <div id="draft-duplicates-list"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700"
+                            >Kwota</label
+                        >
+                        <input
+                            type="number"
+                            step="0.01"
+                            id="draft-amount"
+                            class="w-full border rounded-md px-3 py-2 mt-1"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700"
+                            >Data</label
+                        >
+                        <input
+                            type="date"
+                            id="draft-date"
+                            class="w-full border rounded-md px-3 py-2 mt-1"
+                        />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700"
+                            >Opis</label
+                        >
+                        <input
+                            type="text"
+                            id="draft-description"
+                            class="w-full border rounded-md px-3 py-2 mt-1"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700"
+                            >Kategoria</label
+                        >
+                        <select
+                            id="draft-category"
+                            class="w-full border rounded-md px-3 py-2 mt-1"
+                        >
+                            <option value="">-- wybierz --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Items -->
+                <div id="draft-items-section" class="mb-4">
+                    <h3 class="font-medium text-gray-900 mb-2">
+                        Pozycje na paragonie
+                    </h3>
+                    <div id="draft-items-list" class="space-y-2"></div>
+                    <button
+                        onclick="addDraftItem()"
+                        class="mt-2 text-sm text-primary hover:underline"
+                    >
+                        <i class="fas fa-plus mr-1"></i>Dodaj pozycję
+                    </button>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button
+                        onclick="saveDraftExpense()"
+                        class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700"
+                    >
+                        <i class="fas fa-check mr-2"></i>Zapisz wydatek
+                    </button>
+                    <button
+                        onclick="discardDraft()"
+                        class="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300"
+                    >
+                        <i class="fas fa-times mr-2"></i>Odrzuć
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories View -->
+        <div
+            id="view-categories"
+            class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Kategorie</h1>
+                    <p class="text-gray-600">Zarządzaj kategoriami wydatków</p>
+                </div>
+                <button
+                    onclick="showAddCategoryForm()"
+                    class="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                    <i class="fas fa-plus mr-2"></i>Nowa kategoria
+                </button>
+            </div>
+
+            <div
+                id="add-category-form"
+                class="hidden bg-white rounded-lg shadow p-6 mb-6"
+            >
+                <div class="flex gap-4">
+                    <input
+                        type="text"
+                        id="new-category-name"
+                        class="flex-1 border rounded-md px-3 py-2"
+                        placeholder="Nazwa kategorii"
+                    />
+                    <button
+                        onclick="addCategory()"
+                        class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700"
+                    >
+                        Dodaj
+                    </button>
+                    <button
+                        onclick="hideAddCategoryForm()"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+                    >
+                        Anuluj
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Nazwa
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Akcje
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        id="categories-list"
+                        class="divide-y divide-gray-200"
+                    >
+                        <tr>
+                            <td
+                                colspan="2"
+                                class="px-6 py-4 text-center text-gray-500"
+                            >
+                                Wczytywanie...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Subscriptions View -->
+        <div
+            id="view-subscriptions"
+            class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Abonamenty</h1>
+                    <p class="text-gray-600">Automatyczne wydatki cykliczne</p>
+                </div>
+                <button
+                    onclick="showAddSubscriptionForm()"
+                    class="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                    <i class="fas fa-plus mr-2"></i>Nowy abonament
+                </button>
+            </div>
+
+            <!-- Add Subscription Form -->
+            <div
+                id="add-subscription-form"
+                class="hidden bg-white rounded-lg shadow p-6 mb-6"
+            >
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                        type="text"
+                        id="sub-name"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Nazwa (np. Netflix)"
+                    />
+                    <input
+                        type="number"
+                        step="0.01"
+                        id="sub-amount"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Kwota"
+                    />
+                    <input
+                        type="number"
+                        id="sub-frequency"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Co ile dni (np. 30)"
+                    />
+                    <input
+                        type="date"
+                        id="sub-start"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Data startu"
+                    />
+                    <input
+                        type="date"
+                        id="sub-end"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Data końca (opcjonalna)"
+                    />
+                    <input
+                        type="number"
+                        id="sub-installments"
+                        class="border rounded-md px-3 py-2"
+                        placeholder="Liczba rat (opcjonalna)"
+                    />
+                    <select
+                        id="sub-category"
+                        class="border rounded-md px-3 py-2"
+                    >
+                        <option value="">Kategoria</option>
+                    </select>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button
+                        onclick="addSubscription()"
+                        class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700"
+                    >
+                        Zapisz
+                    </button>
+                    <button
+                        onclick="hideAddSubscriptionForm()"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+                    >
+                        Anuluj
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Nazwa
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Kwota
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Następna płatność
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Akcje
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        id="subscriptions-list"
+                        class="divide-y divide-gray-200"
+                    >
+                        <tr>
+                            <td
+                                colspan="4"
+                                class="px-6 py-4 text-center text-gray-500"
+                            >
+                                Wczytywanie...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Stats View -->
+        <div
+            id="view-stats"
+            class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        >
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Statystyki</h1>
+                    <p class="text-gray-600">Analiza wydatków i wykresy</p>
+                </div>
+                <button
+                    onclick="exportCSV()"
+                    class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700"
+                >
+                    <i class="fas fa-file-csv mr-2"></i>Eksport CSV
+                </button>
+            </div>
+
+            <!-- Period Filter -->
+            <div class="bg-white rounded-lg shadow mb-6 p-4">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Od</label
+                        >
+                        <input
+                            type="date"
+                            id="stats-start"
+                            class="border rounded-md px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Do</label
+                        >
+                        <input
+                            type="date"
+                            id="stats-end"
+                            class="border rounded-md px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <button
+                        onclick="loadStats()"
+                        class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700"
+                    >
+                        <i class="fas fa-sync mr-1"></i> Odśwież
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm font-medium text-gray-600">
+                        Suma wydatków
+                    </p>
+                    <p
+                        id="stats-total"
+                        class="text-2xl font-bold text-gray-900"
+                    >
+                        -
+                    </p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm font-medium text-gray-600">
+                        Liczba transakcji
+                    </p>
+                    <p
+                        id="stats-count"
+                        class="text-2xl font-bold text-gray-900"
+                    >
+                        -
+                    </p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm font-medium text-gray-600">
+                        Średnio dziennie
+                    </p>
+                    <p
+                        id="stats-avg-day"
+                        class="text-2xl font-bold text-gray-900"
+                    >
+                        -
+                    </p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm font-medium text-gray-600">
+                        Średnio na wydatek
+                    </p>
+                    <p
+                        id="stats-avg-exp"
+                        class="text-2xl font-bold text-gray-900"
+                    >
+                        -
+                    </p>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">
+                        Wydatki per kategoria
+                    </h3>
+                    <canvas id="chart-categories"></canvas>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">
+                        Wydatki w czasie
+                    </h3>
+                    <canvas id="chart-daily"></canvas>
+                </div>
+            </div>
+
+            <!-- Monthly Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <h3 class="text-lg font-bold text-gray-900 px-6 py-4 border-b">
+                    Podsumowanie miesięczne
+                </h3>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Miesiąc
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Kwota
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                            >
+                                Liczba
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        id="stats-monthly-list"
+                        class="divide-y divide-gray-200"
+                    ></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div
+            id="toast-container"
+            class="fixed bottom-4 right-4 z-50 space-y-2"
+        ></div>
+
+        <script>
+            // ==================== STATE ====================
+            const API_URL = "/api/v1";
+            let currentDraft = null;
+            let categoriesCache = [];
+
+            // ==================== AUTH ====================
+            function getToken() {
+                return localStorage.getItem("token");
+            }
+
+            function setToken(token) {
+                localStorage.setItem("token", token);
+            }
+
+            function isLoggedIn() {
+                return !!getToken();
+            }
+
+            function logout() {
+                localStorage.removeItem("token");
+                showView("login");
+                document.getElementById("navbar").classList.add("hidden");
+            }
+
+            function toggleAuthMode() {
+                document
+                    .getElementById("login-form")
+                    .classList.toggle("hidden");
+                document
+                    .getElementById("register-form")
+                    .classList.toggle("hidden");
+                document.getElementById("auth-error").classList.add("hidden");
+            }
+
+            async function apiRequest(
+                method,
+                endpoint,
+                body = null,
+                isForm = false,
+            ) {
+                const headers = {};
+                const token = getToken();
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+                if (!isForm && body)
+                    headers["Content-Type"] = "application/json";
+
+                const options = { method, headers };
+                if (body) options.body = isForm ? body : JSON.stringify(body);
+
+                const response = await fetch(`${API_URL}${endpoint}`, options);
+                if (response.status === 401) {
+                    logout();
+                    throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+                }
+                if (!response.ok) {
+                    const err = await response
+                        .json()
+                        .catch(() => ({ detail: "Błąd serwera" }));
+                    throw new Error(err.detail || "Błąd serwera");
+                }
+                if (response.status === 204) return null;
+                return response.json();
+            }
+
+            async function login() {
+                const email = document.getElementById("login-email").value;
+                const password =
+                    document.getElementById("login-password").value;
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append("username", email);
+                    formData.append("password", password);
+                    const response = await fetch(`${API_URL}/auth/login`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        body: formData,
+                    });
+                    if (!response.ok)
+                        throw new Error("Nieprawidłowy email lub hasło");
+                    const data = await response.json();
+                    setToken(data.access_token);
+                    initApp();
+                } catch (e) {
+                    showError(e.message);
+                }
+            }
+
+            async function register() {
+                const email = document.getElementById("reg-email").value;
+                const password = document.getElementById("reg-password").value;
+                const fullName = document.getElementById("reg-fullname").value;
+                try {
+                    await apiRequest("POST", "/auth/register", {
+                        email,
+                        password,
+                        full_name: fullName || null,
+                    });
+                    showToast("Konto utworzone! Zaloguj się.", "success");
+                    toggleAuthMode();
+                } catch (e) {
+                    showError(e.message);
+                }
+            }
+
+            function showError(msg) {
+                const el = document.getElementById("auth-error");
+                el.textContent = msg;
+                el.classList.remove("hidden");
+            }
+
+            // ==================== NAVIGATION ====================
+            function showView(viewName) {
+                document
+                    .querySelectorAll(".view")
+                    .forEach((v) => v.classList.remove("active"));
+                document
+                    .getElementById(`view-${viewName}`)
+                    .classList.add("active");
+
+                if (viewName === "dashboard") loadDashboard();
+                if (viewName === "categories") loadCategories();
+                if (viewName === "subscriptions") loadSubscriptions();
+                if (viewName === "stats") loadStats();
+                if (viewName === "add-expense") {
+                    loadCategoriesSelect();
+                    document.getElementById("manual-date").valueAsDate =
+                        new Date();
+                }
+            }
+
+            // ==================== DASHBOARD ====================
+            async function loadDashboard() {
+                try {
+                    const expenses = await apiRequest(
+                        "GET",
+                        "/expenses/?limit=100",
+                    );
+                    const subs = await apiRequest(
+                        "GET",
+                        "/subscriptions/?active_only=true",
+                    );
+
+                    const monthTotal = expenses.reduce(
+                        (sum, e) => sum + e.amount,
+                        0,
+                    );
+                    document.getElementById("stat-month-total").textContent =
+                        monthTotal.toFixed(2) + " zł";
+                    document.getElementById("stat-count").textContent =
+                        expenses.length;
+                    document.getElementById("stat-subs").textContent =
+                        subs.length;
+
+                    renderExpenses(expenses);
+                    loadCategoriesSelect("filter-category");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            function renderExpenses(expenses) {
+                const tbody = document.getElementById("expenses-list");
+                if (!expenses.length) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak wydatków</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = expenses
+                    .map(
+                        (e) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${e.date}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${e.description || "-"}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${e.category_name || "-"}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
+                    <td class="px-6 py-4 text-center text-sm">
+                        <button onclick="deleteExpense(${e.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `,
+                    )
+                    .join("");
+            }
+
+            async function loadExpenses() {
+                const start = document.getElementById("filter-start").value;
+                const end = document.getElementById("filter-end").value;
+                const cat = document.getElementById("filter-category").value;
+                let url = "/expenses/?limit=100";
+                if (start) url += `&start_date=${start}`;
+                if (end) url += `&end_date=${end}`;
+                if (cat) url += `&category_id=${cat}`;
+
+                try {
+                    const expenses = await apiRequest("GET", url);
+                    renderExpenses(expenses);
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            async function deleteExpense(id) {
+                if (!confirm("Usunąć wydatek?")) return;
+                try {
+                    await apiRequest("DELETE", `/expenses/${id}`);
+                    loadDashboard();
+                    showToast("Wydatek usunięty", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            // ==================== ADD EXPENSE ====================
+            function showExpenseTab(tab) {
+                ["manual", "receipt", "text"].forEach((t) => {
+                    document
+                        .getElementById(`expense-tab-${t}`)
+                        .classList.add("hidden");
+                    const btn = document.getElementById(`tab-${t}`);
+                    btn.classList.remove("border-primary", "text-primary");
+                    btn.classList.add("border-transparent", "text-gray-500");
+                });
+                document
+                    .getElementById(`expense-tab-${tab}`)
+                    .classList.remove("hidden");
+                const activeBtn = document.getElementById(`tab-${tab}`);
+                activeBtn.classList.remove(
+                    "border-transparent",
+                    "text-gray-500",
+                );
+                activeBtn.classList.add("border-primary", "text-primary");
+            }
+
+            async function addManualExpense() {
+                const data = {
+                    amount: parseFloat(
+                        document.getElementById("manual-amount").value,
+                    ),
+                    date: document.getElementById("manual-date").value,
+                    description:
+                        document.getElementById("manual-description").value,
+                    category_id:
+                        document.getElementById("manual-category").value ||
+                        null,
+                    items: [],
+                };
+                try {
+                    await apiRequest("POST", "/expenses/", data);
+                    showToast("Wydatek zapisany!", "success");
+                    showView("dashboard");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            // ==================== RECEIPT UPLOAD ====================
+            const uploadArea = document.getElementById("receipt-upload-area");
+            const fileInput = document.getElementById("receipt-file-input");
+
+            uploadArea.addEventListener("click", () => fileInput.click());
+            uploadArea.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                uploadArea.classList.add("drag-over");
+            });
+            uploadArea.addEventListener("dragleave", () =>
+                uploadArea.classList.remove("drag-over"),
+            );
+            uploadArea.addEventListener("drop", (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove("drag-over");
+                if (e.dataTransfer.files.length)
+                    handleReceiptFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener("change", (e) => {
+                if (e.target.files.length) handleReceiptFile(e.target.files[0]);
+            });
+
+            function handleReceiptFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById("receipt-preview-img").src =
+                        e.target.result;
+                    document
+                        .getElementById("receipt-preview")
+                        .classList.remove("hidden");
+                    document
+                        .getElementById("receipt-upload-area")
+                        .classList.add("hidden");
+                };
+                reader.readAsDataURL(file);
+            }
+
+            async function analyzeReceipt() {
+                const file = fileInput.files[0];
+                if (!file) return showToast("Wybierz zdjęcie", "warning");
+
+                document
+                    .getElementById("receipt-loading")
+                    .classList.remove("hidden");
+                document
+                    .getElementById("receipt-preview")
+                    .classList.add("hidden");
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                try {
+                    const response = await fetch(`${API_URL}/ai/receipt`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${getToken()}` },
+                        body: formData,
+                    });
+                    if (!response.ok) throw new Error("Błąd analizy AI");
+                    const draft = await response.json();
+                    showDraft(draft);
+                } catch (e) {
+                    showToast(e.message, "error");
+                } finally {
+                    document
+                        .getElementById("receipt-loading")
+                        .classList.add("hidden");
+                }
+            }
+
+            // ==================== TEXT AI ====================
+            async function analyzeTextExpense() {
+                const text =
+                    document.getElementById("text-expense-input").value;
+                if (!text.trim())
+                    return showToast("Wpisz opis wydatku", "warning");
+
+                document
+                    .getElementById("text-loading")
+                    .classList.remove("hidden");
+
+                try {
+                    const draft = await apiRequest("POST", "/ai/text", {
+                        text: text.trim(),
+                    });
+                    showDraft(draft);
+                } catch (e) {
+                    showToast(e.message, "error");
+                } finally {
+                    document
+                        .getElementById("text-loading")
+                        .classList.add("hidden");
+                }
+            }
+
+            // ==================== DRAFT REVIEW ====================
+            function showDraft(draft) {
+                currentDraft = draft;
+                document
+                    .getElementById("draft-panel")
+                    .classList.remove("hidden");
+
+                document.getElementById("draft-amount").value = draft.amount;
+                document.getElementById("draft-date").value = draft.date;
+                document.getElementById("draft-description").value =
+                    draft.description || "";
+
+                // Duplicates
+                const dupDiv = document.getElementById("draft-duplicates");
+                if (
+                    draft.duplicate_warnings &&
+                    draft.duplicate_warnings.length
+                ) {
+                    dupDiv.classList.remove("hidden");
+                    document.getElementById("draft-duplicates-list").innerHTML =
+                        draft.duplicate_warnings
+                            .map(
+                                (d) =>
+                                    `<div class="text-sm text-yellow-700"><i class="fas fa-exclamation-circle mr-1"></i>${d.message}</div>`,
+                            )
+                            .join("");
+                } else {
+                    dupDiv.classList.add("hidden");
+                }
+
+                // Categories
+                loadCategoriesSelect("draft-category", draft.category_id);
+
+                // Items
+                const itemsDiv = document.getElementById("draft-items-list");
+                if (draft.items && draft.items.length) {
+                    document
+                        .getElementById("draft-items-section")
+                        .classList.remove("hidden");
+                    itemsDiv.innerHTML = draft.items
+                        .map(
+                            (item, i) => `
+                    <div class="flex gap-2 items-center p-2 bg-gray-50 rounded">
+                        <input type="text" class="flex-1 border rounded px-2 py-1 text-sm" value="${item.name}" id="draft-item-${i}-name">
+                        <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" value="${item.price}" id="draft-item-${i}-price">
+                        <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="${item.quantity}" id="draft-item-${i}-qty">
+                        <select class="w-32 border rounded px-2 py-1 text-sm" id="draft-item-${i}-cat">
+                            ${categoriesCache.map((c) => `<option value="${c.id}" ${c.id === item.category_id ? "selected" : ""}>${c.name}</option>`).join("")}
+                        </select>
+                        <button onclick="this.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
+                    </div>
+                `,
+                        )
+                        .join("");
+                } else {
+                    document
+                        .getElementById("draft-items-section")
+                        .classList.add("hidden");
+                }
+
+                // Hints
+                if (draft.user_hints && draft.user_hints.length) {
+                    draft.user_hints.forEach((h) => showToast(h, "warning"));
+                }
+            }
+
+            function addDraftItem() {
+                const div = document.createElement("div");
+                div.className =
+                    "flex gap-2 items-center p-2 bg-gray-50 rounded";
+                div.innerHTML = `
+                <input type="text" class="flex-1 border rounded px-2 py-1 text-sm" placeholder="Nazwa">
+                <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" placeholder="Cena">
+                <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="1">
+                <select class="w-32 border rounded px-2 py-1 text-sm">
+                    ${categoriesCache.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
+                </select>
+                <button onclick="this.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
+            `;
+                document.getElementById("draft-items-list").appendChild(div);
+            }
+
+            async function saveDraftExpense() {
+                const items = [];
+                document
+                    .querySelectorAll("#draft-items-list > div")
+                    .forEach((div, i) => {
+                        const inputs = div.querySelectorAll("input, select");
+                        items.push({
+                            name: inputs[0].value,
+                            price: parseFloat(inputs[1].value),
+                            quantity: parseFloat(inputs[2].value),
+                            category_id: inputs[3].value || null,
+                        });
+                    });
+
+                const data = {
+                    amount: parseFloat(
+                        document.getElementById("draft-amount").value,
+                    ),
+                    date: document.getElementById("draft-date").value,
+                    description:
+                        document.getElementById("draft-description").value,
+                    category_id:
+                        document.getElementById("draft-category").value || null,
+                    items: items,
+                };
+
+                try {
+                    await apiRequest("POST", "/expenses/", data);
+                    showToast("Wydatek zapisany!", "success");
+                    discardDraft();
+                    showView("dashboard");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            function discardDraft() {
+                currentDraft = null;
+                document.getElementById("draft-panel").classList.add("hidden");
+                document
+                    .getElementById("receipt-upload-area")
+                    .classList.remove("hidden");
+                document
+                    .getElementById("receipt-preview")
+                    .classList.add("hidden");
+                document.getElementById("text-expense-input").value = "";
+            }
+
+            // ==================== CATEGORIES ====================
+            async function loadCategories() {
+                try {
+                    const cats = await apiRequest(
+                        "GET",
+                        "/categories/?include_global=true",
+                    );
+                    categoriesCache = cats;
+                    const tbody = document.getElementById("categories-list");
+                    tbody.innerHTML = cats
+                        .map(
+                            (c) => `
+                    <tr>
+                        <td class="px-6 py-4 text-sm text-gray-900">${c.name}</td>
+                        <td class="px-6 py-4 text-right text-sm">
+                            ${c.user_id ? `<button onclick="deleteCategory(${c.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>` : '<span class="text-gray-400 text-xs">globalna</span>'}
+                        </td>
+                    </tr>
+                `,
+                        )
+                        .join("");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            async function loadCategoriesSelect(
+                selectId = "manual-category",
+                selectedId = null,
+            ) {
+                try {
+                    const cats = await apiRequest(
+                        "GET",
+                        "/categories/?include_global=true",
+                    );
+                    categoriesCache = cats;
+                    const select = document.getElementById(selectId);
+                    if (!select) return;
+                    select.innerHTML =
+                        '<option value="">-- wybierz --</option>' +
+                        cats
+                            .map(
+                                (c) =>
+                                    `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${c.name}</option>`,
+                            )
+                            .join("");
+                } catch (e) {
+                    console.error("Błąd ładowania kategorii:", e);
+                }
+            }
+
+            function showAddCategoryForm() {
+                document
+                    .getElementById("add-category-form")
+                    .classList.remove("hidden");
+            }
+            function hideAddCategoryForm() {
+                document
+                    .getElementById("add-category-form")
+                    .classList.add("hidden");
+            }
+
+            async function addCategory() {
+                const name = document.getElementById("new-category-name").value;
+                if (!name) return;
+                try {
+                    await apiRequest("POST", "/categories/", { name });
+                    hideAddCategoryForm();
+                    loadCategories();
+                    showToast("Kategoria dodana!", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            async function deleteCategory(id) {
+                if (!confirm("Usunąć kategorię?")) return;
+                try {
+                    await apiRequest("DELETE", `/categories/${id}`);
+                    loadCategories();
+                    showToast("Kategoria usunięta", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            // ==================== SUBSCRIPTIONS ====================
+            async function loadSubscriptions() {
+                try {
+                    const subs = await apiRequest("GET", "/subscriptions/");
+                    const tbody = document.getElementById("subscriptions-list");
+                    tbody.innerHTML = subs
+                        .map(
+                            (s) => `
+                    <tr>
+                        <td class="px-6 py-4 text-sm text-gray-900">${s.name}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${s.next_billing_date}</td>
+                        <td class="px-6 py-4 text-right text-sm">
+                            <button onclick="deleteSubscription(${s.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `,
+                        )
+                        .join("");
+                    loadCategoriesSelect("sub-category");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            function showAddSubscriptionForm() {
+                document
+                    .getElementById("add-subscription-form")
+                    .classList.remove("hidden");
+            }
+            function hideAddSubscriptionForm() {
+                document
+                    .getElementById("add-subscription-form")
+                    .classList.add("hidden");
+            }
+
+            async function addSubscription() {
+                const data = {
+                    name: document.getElementById("sub-name").value,
+                    amount: parseFloat(
+                        document.getElementById("sub-amount").value,
+                    ),
+                    frequency_days: parseInt(
+                        document.getElementById("sub-frequency").value,
+                    ),
+                    start_date: document.getElementById("sub-start").value,
+                    end_date: document.getElementById("sub-end").value || null,
+                    next_billing_date:
+                        document.getElementById("sub-start").value,
+                    remaining_installments: document.getElementById(
+                        "sub-installments",
+                    ).value
+                        ? parseInt(
+                              document.getElementById("sub-installments").value,
+                          )
+                        : null,
+                    category_id:
+                        document.getElementById("sub-category").value || null,
+                };
+                try {
+                    await apiRequest("POST", "/subscriptions/", data);
+                    hideAddSubscriptionForm();
+                    loadSubscriptions();
+                    showToast("Abonament dodany!", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            async function deleteSubscription(id) {
+                if (!confirm("Usunąć abonament?")) return;
+                try {
+                    await apiRequest("DELETE", `/subscriptions/${id}`);
+                    loadSubscriptions();
+                    showToast("Abonament usunięty", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            // ==================== STATS & CHARTS ====================
+            let categoryChart = null;
+            let dailyChart = null;
+
+            async function loadStats() {
+                const start = document.getElementById("stats-start").value;
+                const end = document.getElementById("stats-end").value;
+                let url = "/stats/";
+                if (start) url += `?start_date=${start}`;
+                if (end) url += `${start ? "&" : "?"}end_date=${end}`;
+
+                try {
+                    const data = await apiRequest("GET", url);
+
+                    document.getElementById("stats-total").textContent =
+                        data.total_amount.toFixed(2) + " zł";
+                    document.getElementById("stats-count").textContent =
+                        data.total_count;
+                    document.getElementById("stats-avg-day").textContent =
+                        (data.average_per_day || 0).toFixed(2) + " zł";
+                    document.getElementById("stats-avg-exp").textContent =
+                        data.average_per_expense.toFixed(2) + " zł";
+
+                    // Monthly table
+                    const tbody = document.getElementById("stats-monthly-list");
+                    if (data.monthly_summary && data.monthly_summary.length) {
+                        tbody.innerHTML = data.monthly_summary
+                            .map(
+                                (m) => `
+                            <tr>
+                                <td class="px-6 py-4 text-sm text-gray-900">${m.month_name} ${m.year}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 text-right font-medium">${m.total_amount.toFixed(2)} zł</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 text-right">${m.expense_count}</td>
+                            </tr>
+                        `,
+                            )
+                            .join("");
+                    } else {
+                        tbody.innerHTML =
+                            '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak danych</td></tr>';
+                    }
+
+                    // Category chart
+                    const catCtx = document
+                        .getElementById("chart-categories")
+                        .getContext("2d");
+                    if (categoryChart) categoryChart.destroy();
+                    categoryChart = new Chart(catCtx, {
+                        type: "doughnut",
+                        data: {
+                            labels: data.category_summary.map(
+                                (c) => c.category_name,
+                            ),
+                            datasets: [
+                                {
+                                    data: data.category_summary.map(
+                                        (c) => c.total_amount,
+                                    ),
+                                    backgroundColor: [
+                                        "#3b82f6",
+                                        "#22c55e",
+                                        "#f59e0b",
+                                        "#ef4444",
+                                        "#8b5cf6",
+                                        "#06b6d4",
+                                        "#ec4899",
+                                        "#84cc16",
+                                    ],
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { position: "bottom" },
+                            },
+                        },
+                    });
+
+                    // Daily chart
+                    const dailyCtx = document
+                        .getElementById("chart-daily")
+                        .getContext("2d");
+                    if (dailyChart) dailyChart.destroy();
+                    dailyChart = new Chart(dailyCtx, {
+                        type: "line",
+                        data: {
+                            labels: data.daily_expenses.map((d) => d.date),
+                            datasets: [
+                                {
+                                    label: "Kwota (zł)",
+                                    data: data.daily_expenses.map(
+                                        (d) => d.amount,
+                                    ),
+                                    borderColor: "#3b82f6",
+                                    backgroundColor: "rgba(59, 130, 246, 0.1)",
+                                    fill: true,
+                                    tension: 0.3,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: { beginAtZero: true },
+                            },
+                        },
+                    });
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            async function exportCSV() {
+                const start = document.getElementById("stats-start").value;
+                const end = document.getElementById("stats-end").value;
+                let url = "/stats/export";
+                if (start) url += `?start_date=${start}`;
+                if (end) url += `${start ? "&" : "?"}end_date=${end}`;
+
+                try {
+                    const response = await fetch(`${API_URL}${url}`, {
+                        headers: {
+                            Authorization: `Bearer ${getToken()}`,
+                        },
+                    });
+                    if (!response.ok) throw new Error("Błąd eksportu");
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = downloadUrl;
+                    a.download = `wydatki_${new Date().toISOString().split("T")[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    showToast("CSV pobrany!", "success");
+                } catch (e) {
+                    showToast(e.message, "error");
+                }
+            }
+
+            // ==================== UTILS ====================
+            function showToast(message, type = "info") {
+                const container = document.getElementById("toast-container");
+                const toast = document.createElement("div");
+                const colors = {
+                    success: "bg-green-500",
+                    error: "bg-red-500",
+                    warning: "bg-yellow-500",
+                    info: "bg-blue-500",
+                };
+                toast.className = `${colors[type] || colors.info} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 fade-in`;
+                toast.innerHTML = `<span>${message}</span>`;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            }
+
+            // ==================== INIT ====================
+            function initApp() {
+                document.getElementById("navbar").classList.remove("hidden");
+                showView("dashboard");
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                if (isLoggedIn()) {
+                    initApp();
+                } else {
+                    showView("login");
+                }
+            });
+        </script>
+    </body>
+</html>

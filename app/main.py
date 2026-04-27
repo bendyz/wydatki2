@@ -1,0 +1,69 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from app.api.v1.router import api_router
+from app.core.config import settings
+from app.db.session import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Zarządza cyklem życia aplikacji:
+    - startup: inicjalizacja bazy danych i uruchomienie schedulera abonamentów
+    - shutdown: zatrzymanie schedulera
+    """
+    # STARTUP
+    init_db()
+
+    # Import schedulera tutaj, aby uniknąć circular imports przy imporcie main
+    from app.worker.scheduler import shutdown_scheduler, start_scheduler
+
+    start_scheduler()
+    print("🚀 Aplikacja Wydatki 2.0 wystartowała. Scheduler abonamentów aktywny.")
+
+    yield
+
+    # SHUTDOWN
+    shutdown_scheduler()
+    print("🛑 Aplikacja Wydatki 2.0 zamykana. Scheduler zatrzymany.")
+
+
+app = FastAPI(
+    title=settings.app_name,
+    description="Aplikacja do zarządzania wydatkami wspierana przez AI.",
+    version="0.2.0",
+    lifespan=lifespan,
+)
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
+# CORS middleware - pozwala na połączenia z frontendu
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # W produkcji ograniczyć do konkretnych domen!
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Rejestracja routerów API v1
+app.include_router(api_router, prefix="/api/v1")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """
+    Serwuje główną stronę aplikacji (SPA).
+    """
+    return templates.TemplateResponse("index.html", {"request": request})

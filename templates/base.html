@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <</head>meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Wydatki 2.0 - AI Expense Manager{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script></script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3b82f6",
+                        secondary: "#64748b",
+                        success: "#22c55e",
+                        danger: "#ef4444",
+                        warning: "#f59e0b",
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        .view {</style> display: none !important; }
+        .view.active { display: block !important; }
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav id="navbar" class="bg-white shadow-sm border-b hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-wallet text-primary text-2xl mr-3"></i>
+                    <span class="font-bold text-xl text-gray-800">Wydatki 2.0</span>
+                </div>
+                <!-- Desktop menu -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <button onclick="showView('dashboard')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-chart-pie mr-1"></i> Dashboard
+                    </button>
+                    <button onclick="showView('add-expense')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-plus mr-1"></i> Dodaj wydatek
+                    </button>
+                    <button onclick="showView('categories')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-tags mr-1"></i> Kategorie
+                    </button>
+                    <button onclick="showView('subscriptions')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-sync mr-1"></i> Abonamenty
+                    </button>
+                    <button onclick="showView('stats')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-chart-bar mr-1"></i> Statystyki
+                    </button>
+                    <button onclick="logout()" class="px-3 py-2 rounded-md text-sm font-medium text-danger hover:bg-red-50">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Wyloguj
+                    </button>
+                </div>
+                <!-- Mobile menu button -->
+                <div class="flex items-center md:hidden">
+                    <button onclick="toggleMobileMenu()" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu panel -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200">
+            <div class="pt-2 pb-3 space-y-1 px-4">
+                <button onclick="showView('dashboard'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-chart-pie mr-2"></i> Dashboard
+                </button>
+                <button onclick="showView('add-expense'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-plus mr-2"></i> Dodaj wydatek
+                </button>
+                <button onclick="showView('categories'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-tags mr-2"></i> Kategorie
+                </button>
+                <button onclick="showView('subscriptions'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-sync mr-2"></i> Abonamenty
+                </button>
+                <button onclick="showView('stats'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-chart-bar mr-2"></i> Statystyki
+                </button>
+                <button onclick="logout(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-danger hover:bg-red-50">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Wyloguj
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    {% block content %}{% endblock %}
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full px-4"></div>
+
+    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
