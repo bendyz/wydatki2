@@ -1,0 +1,50 @@
+<!-- Subscriptions View -->
+<div id="view-subscriptions" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+  <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Abonamenty</h1>
+      <p class="text-gray-600">Automatyczne wydatki cykliczne</p>
+    </div>
+    <button onclick="showAddSubscriptionForm()" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto">
+      <i class="fas fa-plus mr-2"></i>Nowy abonament
+    </button>
+  </div>
+
+  <div id="add-subscription-form" class="hidden bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <input type="text" id="sub-name" class="border rounded-md px-3 py-2" placeholder="Nazwa (np. Netflix)" />
+      <input type="number" step="0.01" id="sub-amount" class="border rounded-md px-3 py-2" placeholder="Kwota" />
+      <input type="number" id="sub-frequency" class="border rounded-md px-3 py-2" placeholder="Co ile dni (np. 30)" />
+      <input type="date" id="sub-start" class="border rounded-md px-3 py-2" placeholder="Data startu" />
+      <input type="date" id="sub-end" class="border rounded-md px-3 py-2" placeholder="Data końca (opcjonalna)" />
+      <input type="number" id="sub-installments" class="border rounded-md px-3 py-2" placeholder="Liczba rat (opcjonalna)" />
+      <select id="sub-category" class="border rounded-md px-3 py-2">
+        <option value="">Kategoria</option>
+      </select>
+    </div>
+    <div class="mt-4 flex flex-col sm:flex-row gap-2">
+      <button onclick="addSubscription()" class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">Zapisz</button>
+      <button onclick="hideAddSubscriptionForm()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto">Anuluj</button>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kwota</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Następna płatność</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="subscriptions-list" class="divide-y divide-gray-200">
+          <tr>
+            <td colspan="4" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

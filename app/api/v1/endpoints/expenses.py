@@ -118,7 +118,7 @@ def update_existing_expense(
     update_data = expense_update.model_dump(exclude_unset=True)
 
     items = update_data.pop("items", None)
-    items_list = [item.model_dump() for item in items] if items is not None else None
+    items_list = items if items is not None else None
 
     updated = update_expense(
         db,
