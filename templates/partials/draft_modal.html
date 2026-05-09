@@ -1,0 +1,75 @@
+<!-- Draft Review Modal (global, triggered from dashboard and add-expense) -->
+<div id="draft-modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="discardDraft()"></div>
+  <div class="fixed inset-0 z-10 overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-2xl">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-robot text-primary text-lg"></i>
+            <h2 class="text-base font-bold text-gray-900">Propozycja AI – sprawdź przed zapisem</h2>
+          </div>
+          <button onclick="discardDraft()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="p-4 space-y-4 max-h-[65vh] overflow-y-auto">
+          <!-- Duplicate warning -->
+          <div id="draft-duplicates" class="hidden p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="font-medium text-yellow-800 text-sm mb-1">
+              <i class="fas fa-exclamation-triangle mr-1"></i> Możliwy duplikat
+            </p>
+            <div id="draft-duplicates-list" class="text-sm text-yellow-700"></div>
+          </div>
+
+          <!-- Fields -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Kwota</label>
+              <input type="number" step="0.01" id="draft-amount"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Data</label>
+              <input type="date" id="draft-date"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Opis / Sklep</label>
+            <input type="text" id="draft-description"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Kategoria</label>
+            <select id="draft-category"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="">-- wybierz --</option>
+            </select>
+          </div>
+          <div id="draft-items-section" class="hidden">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-xs font-medium text-gray-500">Pozycje na paragonie</label>
+            </div>
+            <div id="draft-items-list" class="space-y-2"></div>
+            <button onclick="addDraftItem()" class="mt-2 text-sm text-primary hover:underline">
+              <i class="fas fa-plus mr-1"></i>Dodaj pozycję
+            </button>
+          </div>
+        </div>
+
+        <div class="px-4 py-3 border-t flex gap-3">
+          <button onclick="saveDraftExpense()"
+            class="flex-1 bg-success text-white py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-green-600 transition-colors">
+            <i class="fas fa-check mr-2"></i>Zapisz wydatek
+          </button>
+          <button onclick="discardDraft()"
+            class="bg-gray-100 text-gray-700 py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
+            Odrzuć
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

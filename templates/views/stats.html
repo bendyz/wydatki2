@@ -10,6 +10,43 @@
     </button>
   </div>
 
+  <!-- Quick stats cards (Ten miesiąc / Liczba wydatków / Aktywne abonamenty) -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <div class="flex items-center">
+        <div class="p-3 rounded-full bg-blue-100 text-primary flex-shrink-0">
+          <i class="fas fa-money-bill-wave text-xl"></i>
+        </div>
+        <div class="ml-4 min-w-0">
+          <p class="text-sm font-medium text-gray-600">Ten miesiąc</p>
+          <p id="stat-month-total" class="text-xl md:text-2xl font-bold text-gray-900 truncate">-</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <div class="flex items-center">
+        <div class="p-3 rounded-full bg-green-100 text-success flex-shrink-0">
+          <i class="fas fa-receipt text-xl"></i>
+        </div>
+        <div class="ml-4 min-w-0">
+          <p class="text-sm font-medium text-gray-600">Liczba wydatków</p>
+          <p id="stat-count" class="text-xl md:text-2xl font-bold text-gray-900 truncate">-</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <div class="flex items-center">
+        <div class="p-3 rounded-full bg-yellow-100 text-warning flex-shrink-0">
+          <i class="fas fa-sync text-xl"></i>
+        </div>
+        <div class="ml-4 min-w-0">
+          <p class="text-sm font-medium text-gray-600">Aktywne abonamenty</p>
+          <p id="stat-subs" class="text-xl md:text-2xl font-bold text-gray-900 truncate">-</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Period Filter -->
   <div class="bg-white rounded-lg shadow mb-6 p-4">
     <div class="flex flex-wrap gap-3 items-end">
@@ -56,7 +93,7 @@
       </div>
     </div>
     <div class="bg-white rounded-lg shadow p-4 md:p-6">
-      <h3 class="text-base md:text-lg font-bold text-gray-900 mb-4">Wydatki w czasie</h3>
+      <h3 class="text-base md:text-lg font-bold text-gray-900 mb-4">Wydatki miesięcznie</h3>
       <div class="relative h-64 md:h-80">
         <canvas id="chart-daily"></canvas>
       </div>

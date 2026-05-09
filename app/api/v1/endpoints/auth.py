@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import create_access_token, decode_access_token, verify_password
-from app.crud.user import create_user, get_user_by_email, get_user_by_id
+from app.crud.user import create_user, get_user_by_email, get_user_by_id, get_users_count
 from app.db.session import get_db
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
@@ -15,6 +15,11 @@ from app.schemas.user import UserCreate, UserResponse
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+
+@router.get("/registration-status", summary="Status rejestracji")
+def registration_status():
+    return {"enabled": settings.registration_enabled}
 
 
 @router.post(
@@ -26,12 +31,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Tworzy nowe konto użytkownika w systemie.
-
-    - Sprawdza czy email jest już zajęty
-    - Hashuje hasło
-    - Zapisuje użytkownika w bazie danych
+    Pierwszy zarejestrowany użytkownik (id=1) automatycznie zostaje administratorem.
     """
-    # Sprawdź czy użytkownik z tym emailem już istnieje
+    if not settings.registration_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rejestracja nowych użytkowników jest wyłączona",
+        )
+
     db_user = get_user_by_email(db, email=user_data.email)
     if db_user:
         raise HTTPException(
@@ -39,8 +46,8 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Użytkownik z tym adresem email już istnieje",
         )
 
-    # Utwórz nowego użytkownika
-    user = create_user(db=db, user=user_data)
+    is_first_user = get_users_count(db) == 0
+    user = create_user(db=db, user=user_data, is_admin=is_first_user)
     return user
 
 
@@ -116,6 +123,15 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_admin(current_user=Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brak uprawnień administratora",
+        )
+    return current_user
 
 
 @router.get(

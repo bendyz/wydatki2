@@ -1,17 +1,17 @@
 <!-- Add Expense View -->
-<div id="view-add-expense" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-  <div class="mb-6">
+<div id="view-add-expense" class="view max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+  <div class="mb-5">
     <h1 class="text-2xl font-bold text-gray-900">Dodaj wydatek</h1>
-    <p class="text-gray-600">Wybierz sposób dodawania</p>
+    <p class="text-gray-500 text-sm mt-1">Wybierz sposób dodawania</p>
   </div>
 
-  <!-- Tabs -->
-  <div class="bg-white rounded-lg shadow mb-6">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <!-- Tabs -->
     <div class="border-b border-gray-200">
       <nav class="-mb-px flex">
         <button onclick="showExpenseTab('manual')" id="tab-manual"
           class="flex-1 py-3 md:py-4 px-1 text-center border-b-2 border-primary text-primary font-medium text-sm">
-          <i class="fas fa-keyboard mr-1 md:mr-2"></i><span class="hidden sm:inline">Ręcznie</span><span class="sm:hidden">Ręcznie</span>
+          <i class="fas fa-keyboard mr-1 md:mr-2"></i>Ręcznie
         </button>
         <button onclick="showExpenseTab('receipt')" id="tab-receipt"
           class="flex-1 py-3 md:py-4 px-1 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm">
@@ -26,28 +26,35 @@
 
     <!-- Manual Form -->
     <div id="expense-tab-manual" class="p-4 md:p-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Kwota</label>
-          <input type="number" step="0.01" id="manual-amount" class="w-full border rounded-md px-3 py-2" placeholder="0.00" />
+          <input type="number" step="0.01" id="manual-amount"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="0.00" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
-          <input type="date" id="manual-date" class="w-full border rounded-md px-3 py-2" />
+          <input type="date" id="manual-date"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Opis / Sklep</label>
-          <input type="text" id="manual-description" class="w-full border rounded-md px-3 py-2" placeholder="np. Biedronka, Netflix..." />
+          <input type="text" id="manual-description"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="np. Biedronka, Netflix..." />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Kategoria</label>
-          <select id="manual-category" class="w-full border rounded-md px-3 py-2">
+          <select id="manual-category"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">-- wybierz --</option>
           </select>
         </div>
       </div>
-      <div class="mt-6">
-        <button onclick="addManualExpense()" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto">
+      <div class="mt-5">
+        <button onclick="addManualExpense()"
+          class="w-full sm:w-auto bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
           <i class="fas fa-save mr-2"></i>Zapisz wydatek
         </button>
       </div>
@@ -56,23 +63,24 @@
     <!-- Receipt Upload -->
     <div id="expense-tab-receipt" class="p-4 md:p-6 hidden">
       <div id="receipt-upload-area"
-        class="border-2 border-dashed border-gray-300 rounded-lg p-8 md:p-12 text-center cursor-pointer hover:border-primary transition-colors">
-        <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-4"></i>
-        <p class="text-base md:text-lg font-medium text-gray-700">Przeciągnij zdjęcie paragonu tutaj</p>
+        class="border-2 border-dashed border-gray-300 rounded-xl p-8 md:p-12 text-center cursor-pointer hover:border-primary hover:bg-blue-50 transition-colors">
+        <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-3"></i>
+        <p class="text-base font-medium text-gray-700">Przeciągnij zdjęcie paragonu tutaj</p>
         <p class="text-sm text-gray-500 mt-1">lub kliknij, aby wybrać plik</p>
         <input type="file" id="receipt-file-input" accept="image/*" class="hidden" />
       </div>
       <div id="receipt-preview" class="hidden mt-4">
         <img id="receipt-preview-img" class="max-h-48 md:max-h-64 mx-auto rounded-lg shadow" />
         <div class="mt-4 flex justify-center">
-          <button onclick="analyzeReceipt()" class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700">
+          <button onclick="analyzeReceipt()"
+            class="bg-success text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
             <i class="fas fa-brain mr-2"></i>Analizuj przez AI
           </button>
         </div>
       </div>
-      <div id="receipt-loading" class="hidden mt-4 text-center">
+      <div id="receipt-loading" class="hidden mt-4 text-center text-gray-500">
         <i class="fas fa-spinner fa-spin text-3xl text-primary"></i>
-        <p class="mt-2 text-gray-600">AI analizuje paragon...</p>
+        <p class="mt-2 text-sm">AI analizuje paragon...</p>
       </div>
     </div>
 
@@ -80,66 +88,21 @@
     <div id="expense-tab-text" class="p-4 md:p-6 hidden">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Opisz wydatek</label>
-        <textarea id="text-expense-input" rows="4" class="w-full border rounded-md px-3 py-2"
+        <textarea id="text-expense-input" rows="4"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
           placeholder="np. Wczoraj wydałem 10zł w żabce na batonika i wodę..."></textarea>
         <p class="text-xs text-gray-500 mt-1">AI rozpozna kwotę, datę, sklep i kategorię.</p>
       </div>
       <div class="mt-4">
-        <button onclick="analyzeTextExpense()" class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">
+        <button onclick="analyzeTextExpense()"
+          class="w-full sm:w-auto bg-success text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
           <i class="fas fa-brain mr-2"></i>Analizuj przez AI
         </button>
       </div>
-      <div id="text-loading" class="hidden mt-4 text-center">
+      <div id="text-loading" class="hidden mt-4 text-center text-gray-500">
         <i class="fas fa-spinner fa-spin text-3xl text-primary"></i>
-        <p class="mt-2 text-gray-600">AI analizuje opis...</p>
+        <p class="mt-2 text-sm">AI analizuje opis...</p>
       </div>
-    </div>
-  </div>
-
-  <!-- AI Draft Review Panel -->
-  <div id="draft-panel" class="hidden bg-white rounded-lg shadow p-4 md:p-6 fade-in">
-    <div class="flex items-center mb-4">
-      <i class="fas fa-robot text-primary text-xl mr-2"></i>
-      <h2 class="text-lg font-bold text-gray-900">Propozycja AI – sprawdź przed zapisaniem</h2>
-    </div>
-    <div id="draft-duplicates" class="hidden mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-      <h3 class="font-medium text-yellow-800 mb-2"><i class="fas fa-exclamation-triangle mr-1"></i> Ostrzeżenie o duplikacie</h3>
-      <div id="draft-duplicates-list"></div>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Kwota</label>
-        <input type="number" step="0.01" id="draft-amount" class="w-full border rounded-md px-3 py-2 mt-1" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Data</label>
-        <input type="date" id="draft-date" class="w-full border rounded-md px-3 py-2 mt-1" />
-      </div>
-      <div class="md:col-span-2">
-        <label class="block text-sm font-medium text-gray-700">Opis</label>
-        <input type="text" id="draft-description" class="w-full border rounded-md px-3 py-2 mt-1" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Kategoria</label>
-        <select id="draft-category" class="w-full border rounded-md px-3 py-2 mt-1">
-          <option value="">-- wybierz --</option>
-        </select>
-      </div>
-    </div>
-    <div id="draft-items-section" class="mb-4">
-      <h3 class="font-medium text-gray-900 mb-2">Pozycje na paragonie</h3>
-      <div id="draft-items-list" class="space-y-2"></div>
-      <button onclick="addDraftItem()" class="mt-2 text-sm text-primary hover:underline">
-        <i class="fas fa-plus mr-1"></i>Dodaj pozycję
-      </button>
-    </div>
-    <div class="flex flex-col sm:flex-row gap-3">
-      <button onclick="saveDraftExpense()" class="bg-success text-white px-6 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">
-        <i class="fas fa-check mr-2"></i>Zapisz wydatek
-      </button>
-      <button onclick="discardDraft()" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto">
-        <i class="fas fa-times mr-2"></i>Odrzuć
-      </button>
     </div>
   </div>
 </div>

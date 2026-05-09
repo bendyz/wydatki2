@@ -23,6 +23,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
@@ -65,6 +66,10 @@ class Expense(Base):
     user = relationship("User", back_populates="expenses")
     category = relationship("Category", back_populates="expenses")
     items = relationship("ExpenseItem", back_populates="expense")
+
+    @property
+    def category_name(self):
+        return self.category.name if self.category else None
 
 
 class ExpenseItem(Base):

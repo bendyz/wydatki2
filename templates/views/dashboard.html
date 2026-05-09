@@ -1,72 +1,66 @@
 <!-- Dashboard View -->
-<div id="view-dashboard" class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-    <p class="text-gray-600">Przegląd Twoich wydatków</p>
-  </div>
+<div id="view-dashboard" class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-7">
 
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
-    <div class="bg-white rounded-lg shadow p-5 md:p-6">
-      <div class="flex items-center">
-        <div class="p-3 rounded-full bg-blue-100 text-primary">
-          <i class="fas fa-money-bill-wave text-xl"></i>
-        </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Ten miesiąc</p>
-          <p id="stat-month-total" class="text-xl md:text-2xl font-bold text-gray-900">-</p>
-        </div>
+  <!-- AI Quick Add -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 mb-5">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      <i class="fas fa-robot text-primary mr-1"></i> Dodaj wydatek z AI
+    </h2>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <!-- Receipt photo button -->
+      <button onclick="document.getElementById('dash-receipt-input').click()"
+        class="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-primary hover:text-primary hover:bg-blue-50 transition-colors cursor-pointer text-sm font-medium">
+        <i class="fas fa-camera text-lg"></i>
+        <span>Zdjęcie paragonu</span>
+      </button>
+      <input type="file" id="dash-receipt-input" accept="image/*" capture="environment" class="hidden"
+        onchange="if(this.files.length) dashboardReceiptSelected(this.files[0])" />
+
+      <!-- Text input -->
+      <div class="flex-1 flex gap-2">
+        <input type="text" id="dash-text-input"
+          placeholder="np. 10 zł w żabce na colę..."
+          class="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          onkeydown="if(event.key==='Enter') dashboardAnalyzeText()" />
+        <button onclick="dashboardAnalyzeText()"
+          class="bg-primary text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 whitespace-nowrap transition-colors">
+          <i class="fas fa-brain mr-1 hidden sm:inline"></i>Analizuj
+        </button>
       </div>
     </div>
-    <div class="bg-white rounded-lg shadow p-5 md:p-6">
-      <div class="flex items-center">
-        <div class="p-3 rounded-full bg-green-100 text-success">
-          <i class="fas fa-receipt text-xl"></i>
-        </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Liczba wydatków</p>
-          <p id="stat-count" class="text-xl md:text-2xl font-bold text-gray-900">-</p>
-        </div>
-      </div>
-    </div>
-    <div class="bg-white rounded-lg shadow p-5 md:p-6">
-      <div class="flex items-center">
-        <div class="p-3 rounded-full bg-yellow-100 text-warning">
-          <i class="fas fa-sync text-xl"></i>
-        </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Aktywne abonamenty</p>
-          <p id="stat-subs" class="text-xl md:text-2xl font-bold text-gray-900">-</p>
-        </div>
-      </div>
+    <!-- Loading state -->
+    <div id="dash-ai-loading" class="hidden mt-3 flex items-center gap-2 text-gray-500 text-sm">
+      <i class="fas fa-spinner fa-spin text-primary"></i>
+      <span>AI analizuje...</span>
     </div>
   </div>
 
   <!-- Filters -->
-  <div class="bg-white rounded-lg shadow mb-6 p-4">
-    <div class="flex flex-wrap gap-3 items-end">
-      <div class="flex-1 min-w-[140px]">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Od</label>
-        <input type="date" id="filter-start" class="w-full border rounded-md px-3 py-2 text-sm" />
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 p-3 md:p-4">
+    <div class="flex flex-wrap gap-2 md:gap-3 items-end">
+      <div class="flex-1 min-w-[130px]">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Od</label>
+        <input type="date" id="filter-start" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
-      <div class="flex-1 min-w-[140px]">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Do</label>
-        <input type="date" id="filter-end" class="w-full border rounded-md px-3 py-2 text-sm" />
+      <div class="flex-1 min-w-[130px]">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Do</label>
+        <input type="date" id="filter-end" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
       </div>
-      <div class="flex-1 min-w-[160px]">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Kategoria</label>
-        <select id="filter-category" class="w-full border rounded-md px-3 py-2 text-sm">
+      <div class="flex-1 min-w-[150px]">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Kategoria</label>
+        <select id="filter-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
           <option value="">Wszystkie</option>
         </select>
       </div>
-      <button onclick="loadExpenses()" class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">
+      <button onclick="loadExpenses()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
         <i class="fas fa-filter mr-1"></i> Filtruj
       </button>
     </div>
   </div>
 
-  <!-- Expenses Table (Desktop + collapsible mobile cards) -->
-  <div class="bg-white rounded-lg shadow overflow-hidden">
+  <!-- Expenses list -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <!-- Desktop table -->
     <div class="hidden md:block overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
@@ -79,74 +73,103 @@
           </tr>
         </thead>
         <tbody id="expenses-list" class="bg-white divide-y divide-gray-200">
-          <tr>
-            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td>
-          </tr>
+          <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td></tr>
         </tbody>
       </table>
     </div>
-    <!-- Mobile cards will be rendered here -->
+    <!-- Mobile cards -->
     <div id="expenses-list-mobile" class="md:hidden divide-y divide-gray-200"></div>
+  </div>
+
+  <!-- Load more -->
+  <div id="load-more-container" class="hidden mt-4 text-center">
+    <button onclick="loadMoreExpenses()"
+      class="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+      <i class="fas fa-chevron-down mr-2"></i>Wczytaj więcej
+    </button>
   </div>
 </div>
 
 <!-- Expense Details Modal -->
-<div id="expense-modal" class="fixed inset-0 z-40 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeExpenseModal()"></div>
+<div id="expense-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeExpenseModal()"></div>
   <div class="fixed inset-0 z-10 overflow-y-auto">
-    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-      <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-        <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-          <div class="sm:flex sm:items-start">
-            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-              <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">Szczegóły wydatku</h3>
-              <div class="mt-4 space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500">Kwota</label>
-                    <input id="modal-amount" type="number" step="0.01" class="w-full border rounded-md px-3 py-2 text-sm" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500">Data</label>
-                    <input id="modal-date" type="date" class="w-full border rounded-md px-3 py-2 text-sm" />
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Opis / Sklep</label>
-                  <input id="modal-description" type="text" class="w-full border rounded-md px-3 py-2 text-sm" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Kategoria</label>
-                  <select id="modal-category" class="w-full border rounded-md px-3 py-2 text-sm">
-                    <option value="">-- wybierz --</option>
-                  </select>
-                </div>
-                <div>
-                  <div class="flex items-center justify-between mb-1">
-                    <label class="block text-xs font-medium text-gray-500">Pozycje</label>
-                    <span id="modal-items-total" class="text-xs text-gray-500"></span>
-                  </div>
-                  <div id="modal-items-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
-                  <button onclick="addModalItem()" class="mt-2 text-sm text-primary hover:underline">
-                    <i class="fas fa-plus mr-1"></i>Dodaj pozycję
-                  </button>
-                </div>
-              </div>
+    <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
+          <h3 class="text-base font-semibold text-gray-900">Szczegóły wydatku</h3>
+          <button onclick="closeExpenseModal()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Kwota</label>
+              <input id="modal-amount" type="number" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Data</label>
+              <input id="modal-date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
           </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Opis / Sklep</label>
+            <input id="modal-description" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Kategoria</label>
+            <select id="modal-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="">-- wybierz --</option>
+            </select>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-gray-500">Pozycje</label>
+              <span id="modal-items-total" class="text-xs text-gray-500"></span>
+            </div>
+            <div id="modal-items-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+            <button onclick="addModalItem()" class="mt-2 text-sm text-primary hover:underline">
+              <i class="fas fa-plus mr-1"></i>Dodaj pozycję
+            </button>
+          </div>
+          <!-- Receipt image -->
+          <div id="modal-receipt-section" class="hidden">
+            <label class="block text-xs font-medium text-gray-500 mb-2">Zdjęcie paragonu</label>
+            <div class="flex justify-center">
+              <img id="modal-receipt-img"
+                class="max-h-48 w-auto rounded-lg shadow cursor-pointer hover:opacity-90 transition-opacity border border-gray-200"
+                onclick="openReceiptFullscreen()"
+                title="Kliknij aby powiększyć" />
+            </div>
+            <button onclick="openReceiptFullscreen()"
+              class="mt-2 text-xs text-primary hover:underline w-full text-center">
+              <i class="fas fa-expand-alt mr-1"></i>Powiększ zdjęcie
+            </button>
+          </div>
         </div>
-        <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
-          <button type="button" onclick="saveExpenseModal()" class="inline-flex w-full justify-center rounded-md bg-success px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-600 sm:w-auto">
-            <i class="fas fa-check mr-2"></i>Zapisz
+        <div class="px-4 py-3 border-t flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <button onclick="deleteExpenseModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-red-50 text-danger text-sm font-medium hover:bg-red-100">
+            <i class="fas fa-trash"></i> Usuń
           </button>
-          <button type="button" onclick="closeExpenseModal()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
+          <button onclick="closeExpenseModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
             Anuluj
           </button>
-          <button type="button" onclick="deleteExpenseModal()" class="mt-3 inline-flex w-full justify-center rounded-md bg-danger px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 sm:mt-0 sm:w-auto">
-            <i class="fas fa-trash mr-2"></i>Usuń
+          <button onclick="saveExpenseModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success text-white text-sm font-semibold hover:bg-green-600">
+            <i class="fas fa-check"></i> Zapisz
           </button>
         </div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Receipt fullscreen overlay -->
+<div id="receipt-fullscreen" class="fixed inset-0 hidden flex items-center justify-center bg-black bg-opacity-90 p-4"
+  style="z-index: 60;" onclick="closeReceiptFullscreen()">
+  <img id="receipt-fullscreen-img" class="max-w-full max-h-full object-contain rounded-lg" />
+  <button class="absolute top-4 right-4 text-white text-2xl w-10 h-10 flex items-center justify-center rounded-full bg-black bg-opacity-50 hover:bg-opacity-80"
+    onclick="event.stopPropagation(); closeReceiptFullscreen()">
+    <i class="fas fa-times"></i>
+  </button>
 </div>

@@ -1,9 +1,15 @@
 // ==================== STATE ====================
 const API_URL = "/api/v1";
+const EXPENSES_PER_PAGE = 50;
 let currentDraft = null;
+let currentReceiptFile = null;
 let categoriesCache = [];
 let currentEditingExpenseId = null;
 let currentExpenses = [];
+let currentExpensesOffset = 0;
+let currentUser = null;
+let _monthCategoryCache = {};
+let _categoryExpenseCache = {};
 
 // ==================== AUTH ====================
 function getToken() {
@@ -17,8 +23,11 @@ function isLoggedIn() {
 }
 function logout() {
     localStorage.removeItem("token");
+    currentUser = null;
     showView("login");
     document.getElementById("navbar").classList.add("hidden");
+    document.getElementById("nav-admin-btn").classList.add("hidden");
+    document.getElementById("nav-admin-btn-mobile").classList.add("hidden");
 }
 function toggleAuthMode() {
     document.getElementById("login-form").classList.toggle("hidden");
@@ -99,6 +108,7 @@ function showView(viewName) {
     if (viewName === "categories") loadCategories();
     if (viewName === "subscriptions") loadSubscriptions();
     if (viewName === "stats") loadStats();
+    if (viewName === "admin") loadAdminConfig();
     if (viewName === "add-expense") {
         loadCategoriesSelect();
         document.getElementById("manual-date").valueAsDate = new Date();
@@ -111,20 +121,81 @@ function toggleMobileMenu() {
 
 // ==================== DASHBOARD ====================
 async function loadDashboard() {
+    currentExpensesOffset = 0;
     try {
-        const expenses = await apiRequest("GET", "/expenses/?limit=100");
-        const subs = await apiRequest("GET", "/subscriptions/?active_only=true");
+        const expenses = await apiRequest("GET", `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=0`);
         currentExpenses = expenses;
-
-        const monthTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
-        document.getElementById("stat-month-total").textContent = monthTotal.toFixed(2) + " zł";
-        document.getElementById("stat-count").textContent = expenses.length;
-        document.getElementById("stat-subs").textContent = subs.length;
-
         renderExpenses(expenses);
+        setLoadMoreVisible(expenses.length === EXPENSES_PER_PAGE);
         loadCategoriesSelect("filter-category");
     } catch (e) {
         showToast(e.message, "error");
+    }
+}
+
+async function loadMoreExpenses() {
+    currentExpensesOffset += EXPENSES_PER_PAGE;
+    const start = document.getElementById("filter-start").value;
+    const end = document.getElementById("filter-end").value;
+    const cat = document.getElementById("filter-category").value;
+    let url = `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=${currentExpensesOffset}`;
+    if (start) url += `&start_date=${start}`;
+    if (end) url += `&end_date=${end}`;
+    if (cat) url += `&category_id=${cat}`;
+    try {
+        const more = await apiRequest("GET", url);
+        currentExpenses = [...currentExpenses, ...more];
+        renderExpenses(currentExpenses);
+        setLoadMoreVisible(more.length === EXPENSES_PER_PAGE);
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+function setLoadMoreVisible(visible) {
+    const el = document.getElementById("load-more-container");
+    if (el) el.classList.toggle("hidden", !visible);
+}
+
+// ==================== DASHBOARD AI QUICK ADD ====================
+async function dashboardReceiptSelected(file) {
+    if (!file) return;
+    currentReceiptFile = file;
+    const loading = document.getElementById("dash-ai-loading");
+    loading.classList.remove("hidden");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+        const response = await fetch(`${API_URL}/ai/receipt`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: formData,
+        });
+        if (!response.ok) throw new Error("Błąd analizy AI");
+        const draft = await response.json();
+        showDraft(draft);
+    } catch (e) {
+        currentReceiptFile = null;
+        showToast(e.message, "error");
+    } finally {
+        loading.classList.add("hidden");
+        document.getElementById("dash-receipt-input").value = "";
+    }
+}
+
+async function dashboardAnalyzeText() {
+    const text = document.getElementById("dash-text-input").value.trim();
+    if (!text) return showToast("Wpisz opis wydatku", "warning");
+    const loading = document.getElementById("dash-ai-loading");
+    loading.classList.remove("hidden");
+    try {
+        const draft = await apiRequest("POST", "/ai/text", { text });
+        showDraft(draft);
+        document.getElementById("dash-text-input").value = "";
+    } catch (e) {
+        showToast(e.message, "error");
+    } finally {
+        loading.classList.add("hidden");
     }
 }
 
@@ -146,7 +217,8 @@ function renderExpenses(expenses) {
             <td class="px-4 py-3 text-sm text-gray-900">${e.description || "-"}</td>
             <td class="px-4 py-3 text-sm text-gray-500">${e.category_name || "-"}</td>
             <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
-            <td class="px-4 py-3 text-center text-sm">
+            <td class="px-4 py-3 text-center text-sm whitespace-nowrap">
+                ${e.receipt_image_path ? `<button onclick="event.stopPropagation(); viewReceipt(${e.id})" class="text-gray-400 hover:text-gray-700 mr-2" title="Podgląd paragonu"><i class="fas fa-image"></i></button>` : ""}
                 <button onclick="event.stopPropagation(); openExpenseModal(${e.id})" class="text-primary hover:text-blue-700 mr-2" title="Edytuj"><i class="fas fa-pen"></i></button>
                 <button onclick="event.stopPropagation(); deleteExpense(${e.id})" class="text-danger hover:text-red-700" title="Usuń"><i class="fas fa-trash"></i></button>
             </td>
@@ -172,6 +244,7 @@ function renderExpenses(expenses) {
                 <div class="text-right ml-3">
                     <p class="text-sm font-bold text-gray-900">${e.amount.toFixed(2)} zł</p>
                     <div class="mt-1">
+                        ${e.receipt_image_path ? `<button onclick="viewReceipt(${e.id})" class="text-gray-400 hover:text-gray-700 mr-2" title="Paragon"><i class="fas fa-image"></i></button>` : ""}
                         <button onclick="openExpenseModal(${e.id})" class="text-primary hover:text-blue-700 mr-2" title="Edytuj"><i class="fas fa-pen"></i></button>
                         <button onclick="deleteExpense(${e.id})" class="text-danger hover:text-red-700" title="Usuń"><i class="fas fa-trash"></i></button>
                     </div>
@@ -191,17 +264,19 @@ function renderExpenses(expenses) {
 }
 
 async function loadExpenses() {
+    currentExpensesOffset = 0;
     const start = document.getElementById("filter-start").value;
     const end = document.getElementById("filter-end").value;
     const cat = document.getElementById("filter-category").value;
-    let url = "/expenses/?limit=100";
+    let url = `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=0`;
     if (start) url += `&start_date=${start}`;
     if (end) url += `&end_date=${end}`;
     if (cat) url += `&category_id=${cat}`;
-
     try {
         const expenses = await apiRequest("GET", url);
+        currentExpenses = expenses;
         renderExpenses(expenses);
+        setLoadMoreVisible(expenses.length === EXPENSES_PER_PAGE);
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -219,6 +294,8 @@ async function deleteExpense(id) {
 }
 
 // ==================== EXPENSE MODAL (EDIT / VIEW) ====================
+let currentReceiptBlobUrl = null;
+
 function openExpenseModal(expenseId) {
     const expense = currentExpenses.find((e) => e.id === expenseId);
     if (!expense) return;
@@ -249,12 +326,66 @@ function openExpenseModal(expenseId) {
     }
     updateModalItemsTotal();
 
+    // Receipt image
+    if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
+    const receiptSection = document.getElementById("modal-receipt-section");
+    receiptSection.classList.add("hidden");
+    document.getElementById("modal-receipt-img").src = "";
+    if (expense.receipt_image_path) {
+        loadReceiptImage(expenseId);
+    }
+
     document.getElementById("expense-modal").classList.remove("hidden");
+}
+
+async function viewReceipt(expenseId) {
+    try {
+        const response = await fetch(`${API_URL}/receipts/${expenseId}/receipt`, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!response.ok) return showToast("Brak zdjęcia paragonu", "warning");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        document.getElementById("receipt-fullscreen-img").src = url;
+        document.getElementById("receipt-fullscreen").classList.remove("hidden");
+        // revoke after close
+        document.getElementById("receipt-fullscreen").dataset.blobUrl = url;
+    } catch (e) {
+        showToast("Błąd ładowania paragonu", "error");
+    }
+}
+
+async function loadReceiptImage(expenseId) {
+    try {
+        const response = await fetch(`${API_URL}/receipts/${expenseId}/receipt`, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!response.ok) return;
+        const blob = await response.blob();
+        currentReceiptBlobUrl = URL.createObjectURL(blob);
+        const img = document.getElementById("modal-receipt-img");
+        img.src = currentReceiptBlobUrl;
+        document.getElementById("modal-receipt-section").classList.remove("hidden");
+    } catch (_) {}
+}
+
+function openReceiptFullscreen() {
+    if (!currentReceiptBlobUrl) return;
+    document.getElementById("receipt-fullscreen-img").src = currentReceiptBlobUrl;
+    document.getElementById("receipt-fullscreen").classList.remove("hidden");
+}
+
+function closeReceiptFullscreen() {
+    const el = document.getElementById("receipt-fullscreen");
+    el.classList.add("hidden");
+    const blobUrl = el.dataset.blobUrl;
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); delete el.dataset.blobUrl; }
 }
 
 function closeExpenseModal() {
     document.getElementById("expense-modal").classList.add("hidden");
     currentEditingExpenseId = null;
+    if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
 }
 
 function addModalItem() {
@@ -362,10 +493,11 @@ async function addManualExpense() {
     }
 }
 
-// ==================== RECEIPT UPLOAD ====================
-const uploadArea = document.getElementById("receipt-upload-area");
-const fileInput = document.getElementById("receipt-file-input");
-if (uploadArea) {
+// ==================== RECEIPT UPLOAD (add-expense view) ====================
+function initReceiptUpload() {
+    const uploadArea = document.getElementById("receipt-upload-area");
+    const fileInput = document.getElementById("receipt-file-input");
+    if (!uploadArea || !fileInput) return;
     uploadArea.addEventListener("click", () => fileInput.click());
     uploadArea.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -377,8 +509,6 @@ if (uploadArea) {
         uploadArea.classList.remove("drag-over");
         if (e.dataTransfer.files.length) handleReceiptFile(e.dataTransfer.files[0]);
     });
-}
-if (fileInput) {
     fileInput.addEventListener("change", (e) => {
         if (e.target.files.length) handleReceiptFile(e.target.files[0]);
     });
@@ -395,8 +525,9 @@ function handleReceiptFile(file) {
 }
 
 async function analyzeReceipt() {
-    const file = fileInput.files[0];
+    const file = document.getElementById("receipt-file-input").files[0];
     if (!file) return showToast("Wybierz zdjęcie", "warning");
+    currentReceiptFile = file;
 
     document.getElementById("receipt-loading").classList.remove("hidden");
     document.getElementById("receipt-preview").classList.add("hidden");
@@ -437,10 +568,9 @@ async function analyzeTextExpense() {
     }
 }
 
-// ==================== DRAFT REVIEW ====================
+// ==================== DRAFT REVIEW (modal) ====================
 function showDraft(draft) {
     currentDraft = draft;
-    document.getElementById("draft-panel").classList.remove("hidden");
 
     document.getElementById("draft-amount").value = draft.amount;
     document.getElementById("draft-date").value = draft.date;
@@ -450,7 +580,7 @@ function showDraft(draft) {
     if (draft.duplicate_warnings && draft.duplicate_warnings.length) {
         dupDiv.classList.remove("hidden");
         document.getElementById("draft-duplicates-list").innerHTML = draft.duplicate_warnings
-            .map((d) => `<div class="text-sm text-yellow-700"><i class="fas fa-exclamation-circle mr-1"></i>${escapeHtml(d.message)}</div>`)
+            .map((d) => `<div><i class="fas fa-exclamation-circle mr-1"></i>${escapeHtml(d.message)}</div>`)
             .join("");
     } else {
         dupDiv.classList.add("hidden");
@@ -481,6 +611,8 @@ function showDraft(draft) {
     if (draft.user_hints && draft.user_hints.length) {
         draft.user_hints.forEach((h) => showToast(h, "warning"));
     }
+
+    document.getElementById("draft-modal").classList.remove("hidden");
 }
 
 function addDraftItem() {
@@ -504,10 +636,12 @@ async function saveDraftExpense() {
     const items = [];
     document.querySelectorAll("#draft-items-list > div").forEach((div) => {
         const inputs = div.querySelectorAll("input, select");
+        const name = inputs[0].value.trim();
+        if (!name) return;
         items.push({
-            name: inputs[0].value,
-            price: parseFloat(inputs[1].value),
-            quantity: parseFloat(inputs[2].value),
+            name,
+            price: parseFloat(inputs[1].value) || 0,
+            quantity: parseFloat(inputs[2].value) || 1,
             category_id: inputs[3].value || null,
         });
     });
@@ -517,14 +651,24 @@ async function saveDraftExpense() {
         date: document.getElementById("draft-date").value,
         description: document.getElementById("draft-description").value,
         category_id: document.getElementById("draft-category").value || null,
-        items: items,
+        items,
     };
 
     try {
-        await apiRequest("POST", "/expenses/", data);
+        const saved = await apiRequest("POST", "/expenses/", data);
+        // Dołącz zdjęcie paragonu jeśli było użyte do analizy
+        if (currentReceiptFile && saved && saved.id) {
+            const formData = new FormData();
+            formData.append("file", currentReceiptFile);
+            await fetch(`${API_URL}/receipts/${saved.id}/receipt`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${getToken()}` },
+                body: formData,
+            }).catch(() => {});
+        }
         showToast("Wydatek zapisany!", "success");
         discardDraft();
-        showView("dashboard");
+        loadDashboard();
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -532,10 +676,15 @@ async function saveDraftExpense() {
 
 function discardDraft() {
     currentDraft = null;
-    document.getElementById("draft-panel").classList.add("hidden");
-    document.getElementById("receipt-upload-area").classList.remove("hidden");
-    document.getElementById("receipt-preview").classList.add("hidden");
-    document.getElementById("text-expense-input").value = "";
+    currentReceiptFile = null;
+    document.getElementById("draft-modal").classList.add("hidden");
+    // Reset upload area in add-expense view
+    const uploadArea = document.getElementById("receipt-upload-area");
+    if (uploadArea) uploadArea.classList.remove("hidden");
+    const preview = document.getElementById("receipt-preview");
+    if (preview) preview.classList.add("hidden");
+    const textInput = document.getElementById("text-expense-input");
+    if (textInput) textInput.value = "";
 }
 
 // ==================== CATEGORIES ====================
@@ -666,39 +815,56 @@ let categoryChart = null;
 let dailyChart = null;
 
 async function loadStats() {
-    const start = document.getElementById("stats-start").value;
-    const end = document.getElementById("stats-end").value;
-    let url = "/stats/";
-    if (start) url += `?start_date=${start}`;
-    if (end) url += `${start ? "&" : "?"}end_date=${end}`;
+    const now = new Date();
+
+    // Default: last 12 months
+    const startEl = document.getElementById("stats-start");
+    const endEl = document.getElementById("stats-end");
+    if (!startEl.value) {
+        const d = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        startEl.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+    if (!endEl.value) {
+        endEl.value = now.toISOString().split("T")[0];
+    }
+
+    const start = startEl.value;
+    const end = endEl.value;
+
+    // Reset expansion caches on each full reload
+    _monthCategoryCache = {};
+    _categoryExpenseCache = {};
+
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
     try {
-        const data = await apiRequest("GET", url);
+        const [data, monthData, subs] = await Promise.all([
+            apiRequest("GET", `/stats/?start_date=${start}&end_date=${end}`),
+            apiRequest("GET", `/stats/?start_date=${monthStart}`),
+            apiRequest("GET", "/subscriptions/?active_only=true"),
+        ]);
 
+        // Top quick cards
+        document.getElementById("stat-month-total").textContent = monthData.total_amount.toFixed(2) + " zł";
+        document.getElementById("stat-count").textContent = data.total_count;
+        document.getElementById("stat-subs").textContent = subs.length;
+
+        // Detailed summary cards
         document.getElementById("stats-total").textContent = data.total_amount.toFixed(2) + " zł";
         document.getElementById("stats-count").textContent = data.total_count;
         document.getElementById("stats-avg-day").textContent = (data.average_per_day || 0).toFixed(2) + " zł";
         document.getElementById("stats-avg-exp").textContent = data.average_per_expense.toFixed(2) + " zł";
 
-        const tbody = document.getElementById("stats-monthly-list");
-        if (data.monthly_summary && data.monthly_summary.length) {
-            tbody.innerHTML = data.monthly_summary.map((m) => `
-                <tr>
-                    <td class="px-4 py-3 text-sm text-gray-900">${m.month_name} ${m.year}</td>
-                    <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">${m.total_amount.toFixed(2)} zł</td>
-                    <td class="px-4 py-3 text-sm text-gray-500 text-right">${m.expense_count}</td>
-                </tr>
-            `).join("");
-        } else {
-            tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak danych</td></tr>';
-        }
+        // Monthly table (expandable)
+        renderMonthlyTable(data.monthly_summary);
 
+        // Category doughnut chart
         const catCtx = document.getElementById("chart-categories").getContext("2d");
         if (categoryChart) categoryChart.destroy();
         categoryChart = new Chart(catCtx, {
             type: "doughnut",
             data: {
-                labels: data.category_summary.map((c) => c.category_name),
+                labels: data.category_summary.map((c) => c.category_name || "Bez kategorii"),
                 datasets: [{
                     data: data.category_summary.map((c) => c.total_amount),
                     backgroundColor: ["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16"],
@@ -711,30 +877,161 @@ async function loadStats() {
             },
         });
 
+        // Monthly bar chart (sorted ascending)
+        const sorted = [...data.monthly_summary].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
         const dailyCtx = document.getElementById("chart-daily").getContext("2d");
         if (dailyChart) dailyChart.destroy();
         dailyChart = new Chart(dailyCtx, {
-            type: "line",
+            type: "bar",
             data: {
-                labels: data.daily_expenses.map((d) => d.date),
+                labels: sorted.map((m) => `${m.month_name} ${m.year}`),
                 datasets: [{
                     label: "Kwota (zł)",
-                    data: data.daily_expenses.map((d) => d.amount),
+                    data: sorted.map((m) => m.total_amount),
+                    backgroundColor: "rgba(59, 130, 246, 0.7)",
                     borderColor: "#3b82f6",
-                    backgroundColor: "rgba(59, 130, 246, 0.1)",
-                    fill: true,
-                    tension: 0.3,
+                    borderWidth: 1,
                 }],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { y: { beginAtZero: true } },
+                plugins: { legend: { display: false } },
             },
         });
     } catch (e) {
         showToast(e.message, "error");
     }
+}
+
+function renderMonthlyTable(monthlySummary) {
+    const tbody = document.getElementById("stats-monthly-list");
+    if (!monthlySummary || !monthlySummary.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak danych</td></tr>';
+        return;
+    }
+    // Sort descending (newest first)
+    const rows = [...monthlySummary].sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month);
+    tbody.innerHTML = rows.map((m) => `
+        <tr class="month-row cursor-pointer hover:bg-blue-50 transition-colors"
+            data-year="${m.year}" data-month="${m.month}"
+            onclick="toggleMonthDetails(${m.year}, ${m.month}, this)">
+            <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+                <i class="fas fa-chevron-right text-gray-400 mr-2 expand-icon transition-transform duration-200"></i>
+                ${m.month_name} ${m.year}
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-900 text-right font-semibold">${m.total_amount.toFixed(2)} zł</td>
+            <td class="px-4 py-3 text-sm text-gray-500 text-right">${m.expense_count}</td>
+        </tr>
+    `).join("");
+}
+
+async function toggleMonthDetails(year, month, rowEl) {
+    const key = `${year}-${month}`;
+    const existingDetail = document.getElementById(`month-detail-${key}`);
+    if (existingDetail) {
+        existingDetail.remove();
+        rowEl.querySelector(".expand-icon").style.transform = "";
+        return;
+    }
+
+    rowEl.querySelector(".expand-icon").style.transform = "rotate(90deg)";
+
+    if (!_monthCategoryCache[key]) {
+        const monthStr = String(month).padStart(2, "0");
+        const lastDay = new Date(year, month, 0).getDate();
+        const start = `${year}-${monthStr}-01`;
+        const end = `${year}-${monthStr}-${lastDay}`;
+        try {
+            const data = await apiRequest("GET", `/stats/?start_date=${start}&end_date=${end}`);
+            _monthCategoryCache[key] = { cats: data.category_summary, start, end };
+        } catch (e) {
+            showToast(e.message, "error");
+            rowEl.querySelector(".expand-icon").style.transform = "";
+            return;
+        }
+    }
+
+    const { cats, start, end } = _monthCategoryCache[key];
+    const detailRow = document.createElement("tr");
+    detailRow.id = `month-detail-${key}`;
+    detailRow.innerHTML = `
+        <td colspan="3" class="px-0 py-0 bg-gray-50">
+            <table class="min-w-full">
+                <tbody id="month-cats-${key}">
+                    ${cats.map((c) => {
+                        const catId = c.category_id || "null";
+                        const catName = c.category_name || "Bez kategorii";
+                        return `<tr class="cat-row cursor-pointer hover:bg-blue-100 transition-colors"
+                                    onclick="toggleCategoryExpenses('${key}-${catId}', '${key}', ${c.category_id || "null"}, '${start}', '${end}', this)">
+                                    <td class="pl-10 pr-4 py-2 text-sm text-gray-700">
+                                        <i class="fas fa-chevron-right text-gray-400 mr-2 expand-icon transition-transform duration-200"></i>
+                                        ${catName}
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-gray-800 text-right font-medium">${c.total_amount.toFixed(2)} zł</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500 text-right">${c.expense_count}</td>
+                                </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        </td>`;
+    rowEl.insertAdjacentElement("afterend", detailRow);
+}
+
+async function toggleCategoryExpenses(cacheKey, monthKey, categoryId, start, end, rowEl) {
+    const existingDetail = document.getElementById(`cat-detail-${cacheKey}`);
+    if (existingDetail) {
+        existingDetail.remove();
+        rowEl.querySelector(".expand-icon").style.transform = "";
+        return;
+    }
+
+    rowEl.querySelector(".expand-icon").style.transform = "rotate(90deg)";
+
+    if (!_categoryExpenseCache[cacheKey]) {
+        try {
+            let url;
+            if (categoryId === null || categoryId === "null") {
+                // Fetch all for the month, then filter uncategorized client-side
+                const all = await apiRequest("GET", `/expenses/?start_date=${start}&end_date=${end}&limit=500`);
+                _categoryExpenseCache[cacheKey] = all.filter(e => !e.category_id);
+            } else {
+                _categoryExpenseCache[cacheKey] = await apiRequest("GET", `/expenses/?start_date=${start}&end_date=${end}&category_id=${categoryId}&limit=500`);
+            }
+        } catch (e) {
+            showToast(e.message, "error");
+            rowEl.querySelector(".expand-icon").style.transform = "";
+            return;
+        }
+    }
+
+    const expenses = _categoryExpenseCache[cacheKey];
+    const tbody = rowEl.closest("tbody");
+    const detailRow = document.createElement("tr");
+    detailRow.id = `cat-detail-${cacheKey}`;
+
+    if (!expenses.length) {
+        detailRow.innerHTML = `<td colspan="3" class="pl-16 pr-4 py-2 text-xs text-gray-400 italic">Brak wydatków</td>`;
+    } else {
+        detailRow.innerHTML = `
+            <td colspan="3" class="px-0 py-0">
+                <table class="min-w-full bg-white">
+                    <tbody>
+                        ${expenses.map(e => `
+                            <tr class="hover:bg-gray-50">
+                                <td class="pl-16 pr-4 py-1.5 text-xs text-gray-600">${e.date} — ${e.description || "—"}</td>
+                                <td class="px-4 py-1.5 text-xs text-gray-800 text-right font-medium">${e.amount.toFixed(2)} zł</td>
+                                <td class="px-4 py-1.5 text-xs text-gray-400 text-right">
+                                    <button onclick="event.stopPropagation(); openExpenseModal(${e.id})" class="text-primary hover:underline">edytuj</button>
+                                </td>
+                            </tr>`).join("")}
+                    </tbody>
+                </table>
+            </td>`;
+    }
+
+    rowEl.insertAdjacentElement("afterend", detailRow);
 }
 
 async function exportCSV() {
@@ -788,12 +1085,105 @@ function escapeHtml(text) {
 }
 
 // ==================== INIT ====================
-function initApp() {
+async function initApp() {
     document.getElementById("navbar").classList.remove("hidden");
+    try {
+        currentUser = await apiRequest("GET", "/auth/me");
+        if (currentUser.is_admin) {
+            document.getElementById("nav-admin-btn").classList.remove("hidden");
+            document.getElementById("nav-admin-btn-mobile").classList.remove("hidden");
+        }
+    } catch (e) {
+        // kontynuuj bez danych użytkownika
+    }
     showView("dashboard");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+// ==================== ADMIN ====================
+async function loadAdminConfig() {
+    try {
+        const cfg = await apiRequest("GET", "/admin/config");
+        document.getElementById("cfg-registration-enabled").checked = cfg.registration_enabled;
+        document.getElementById("cfg-app-name").value = cfg.app_name;
+        document.getElementById("cfg-debug").checked = cfg.debug;
+        document.getElementById("cfg-secret-key").value = cfg.SECRET_KEY;
+        document.getElementById("cfg-token-expire").value = cfg.ACCESS_TOKEN_EXPIRE_MINUTES;
+        document.getElementById("cfg-server-host").value = cfg.server_host;
+        document.getElementById("cfg-server-port").value = cfg.server_port;
+        document.getElementById("cfg-openrouter-key").value = cfg.openrouter_api_key;
+        document.getElementById("cfg-openrouter-model").value = cfg.openrouter_model;
+        document.getElementById("cfg-openrouter-max-tokens").value = cfg.openrouter_max_tokens;
+        document.getElementById("cfg-openrouter-temperature").value = cfg.openrouter_temperature;
+        document.getElementById("cfg-personal-context").value = cfg.personal_context.join("\n");
+        document.getElementById("cfg-dup-days").value = cfg.duplicates_date_range_days;
+        document.getElementById("cfg-dup-amount").value = cfg.duplicates_amount_threshold;
+    } catch (e) {
+        showToast("Błąd ładowania konfiguracji: " + e.message, "error");
+    }
+}
+
+async function saveAdminConfig(event) {
+    event.preventDefault();
+    const personalContextRaw = document.getElementById("cfg-personal-context").value;
+    const personalContext = personalContextRaw
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+
+    const payload = {
+        registration_enabled: document.getElementById("cfg-registration-enabled").checked,
+        app_name: document.getElementById("cfg-app-name").value,
+        debug: document.getElementById("cfg-debug").checked,
+        SECRET_KEY: document.getElementById("cfg-secret-key").value,
+        ACCESS_TOKEN_EXPIRE_MINUTES: parseInt(document.getElementById("cfg-token-expire").value),
+        server_host: document.getElementById("cfg-server-host").value,
+        server_port: parseInt(document.getElementById("cfg-server-port").value),
+        database_url: null, // filled below
+        storage_uploads_path: null,
+        openrouter_api_key: document.getElementById("cfg-openrouter-key").value,
+        openrouter_model: document.getElementById("cfg-openrouter-model").value,
+        openrouter_max_tokens: parseInt(document.getElementById("cfg-openrouter-max-tokens").value),
+        openrouter_temperature: parseFloat(document.getElementById("cfg-openrouter-temperature").value),
+        personal_context: personalContext,
+        duplicates_date_range_days: parseInt(document.getElementById("cfg-dup-days").value),
+        duplicates_amount_threshold: parseFloat(document.getElementById("cfg-dup-amount").value),
+    };
+
+    // pobierz pozostałe pola (database_url, storage) z aktualnej konfiguracji
+    try {
+        const current = await apiRequest("GET", "/admin/config");
+        payload.database_url = current.database_url;
+        payload.storage_uploads_path = current.storage_uploads_path;
+    } catch (_) {}
+
+    try {
+        await apiRequest("PUT", "/admin/config", payload);
+        showToast("Konfiguracja zapisana", "success");
+    } catch (e) {
+        showToast("Błąd zapisu: " + e.message, "error");
+    }
+}
+
+function toggleApiKeyVisibility() {
+    const el = document.getElementById("cfg-openrouter-key");
+    el.type = el.type === "password" ? "text" : "password";
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    initReceiptUpload();
+
+    // Dashboard receipt input handled via onchange attribute in HTML
+
+    // Sprawdź status rejestracji i pokaż/ukryj link rejestracji
+    try {
+        const status = await fetch(`${API_URL}/auth/registration-status`);
+        const data = await status.json();
+        if (!data.enabled) {
+            const regLink = document.querySelector("#login-form p");
+            if (regLink) regLink.classList.add("hidden");
+        }
+    } catch (_) {}
+
     if (isLoggedIn()) {
         initApp();
     } else {

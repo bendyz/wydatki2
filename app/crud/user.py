@@ -5,6 +5,10 @@ from app.models.models import User
 from app.schemas.user import UserCreate
 
 
+def get_users_count(db: Session) -> int:
+    return db.query(User).count()
+
+
 def get_user_by_email(db: Session, email: str):
     """
     Pobiera użytkownika z bazy danych na podstawie adresu email.
@@ -33,13 +37,14 @@ def get_user_by_id(db: Session, user_id: int):
     return db.query(User).filter(User.id == user_id).first()
 
 
-def create_user(db: Session, user: UserCreate):
+def create_user(db: Session, user: UserCreate, is_admin: bool = False):
     """
     Tworzy nowego użytkownika w bazie danych.
 
     Args:
         db: Sesja bazy danych SQLAlchemy
         user: Schemat danych nowego użytkownika
+        is_admin: Czy użytkownik ma mieć uprawnienia administratora
 
     Returns:
         Utworzony obiekt User
@@ -49,6 +54,7 @@ def create_user(db: Session, user: UserCreate):
         email=user.email,
         hashed_password=hashed_password,
         full_name=user.full_name,
+        is_admin=is_admin,
     )
     db.add(db_user)
     db.commit()

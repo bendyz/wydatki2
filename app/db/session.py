@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -40,3 +40,12 @@ def init_db():
     Wywoływane przy starcie aplikacji.
     """
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0 NOT NULL"))
+            conn.commit()
+        except Exception:
+            pass  # kolumna już istnieje
+        # Upewnij się, że user id=1 jest adminem (dla istniejących baz)
+        conn.execute(text("UPDATE users SET is_admin = 1 WHERE id = 1 AND is_admin = 0"))
+        conn.commit()

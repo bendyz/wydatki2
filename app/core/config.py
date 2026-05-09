@@ -36,6 +36,7 @@ class Settings(BaseModel):
 
     app_name: str = "Wydatki 2.0"
     debug: bool = True
+    registration_enabled: bool = True
 
     # JWT Security
     SECRET_KEY: str = "dev-secret-key-change-in-production"
@@ -72,6 +73,33 @@ class Settings(BaseModel):
             data.setdefault("server", {})["port"] = int(env_port)
 
         return cls(**data)
+
+    def save_to_yaml(self, yaml_path: str = "data/config/config.yaml") -> None:
+        data = {
+            "app_name": self.app_name,
+            "debug": self.debug,
+            "registration_enabled": self.registration_enabled,
+            "SECRET_KEY": self.SECRET_KEY,
+            "ALGORITHM": self.ALGORITHM,
+            "ACCESS_TOKEN_EXPIRE_MINUTES": self.ACCESS_TOKEN_EXPIRE_MINUTES,
+            "server": {"port": self.server.port, "host": self.server.host},
+            "database": {"url": self.database.url},
+            "storage": {"uploads_path": self.storage.uploads_path},
+            "openrouter": {
+                "api_key": self.openrouter.api_key,
+                "model": self.openrouter.model,
+                "max_tokens": self.openrouter.max_tokens,
+                "temperature": self.openrouter.temperature,
+            },
+            "personal_context": self.personal_context,
+            "duplicates": {
+                "date_range_days": self.duplicates.date_range_days,
+                "amount_threshold": self.duplicates.amount_threshold,
+            },
+        }
+        Path(yaml_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
 
 settings = Settings.from_yaml()

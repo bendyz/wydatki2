@@ -70,6 +70,7 @@ class ExpenseResponse(ExpenseBase):
 
     id: int
     user_id: int
+    category_name: Optional[str] = None
     metadata_ai: Optional[str] = None
     receipt_image_path: Optional[str] = Field(
         None, description="Ścieżka do przetworzonego zdjęcia paragonu na dysku"
