@@ -1,0 +1,30 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data directory — mounted as volume at runtime
+data/
+
+# Dev/migration scripts
+migrate_from_old.py
+copy_receipts.sh
+tests/
+uploads/
+
+# Git
+.git/
+.gitignore
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+CLAUDE.md
+*.md
