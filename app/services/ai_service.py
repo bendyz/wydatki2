@@ -14,8 +14,12 @@ from app.crud.expense import get_expenses
 from app.schemas.ai_draft import DraftDuplicateWarning, DraftExpenseItem, ExpenseDraft
 
 
-def _build_system_prompt(user_categories: List[dict]) -> str:
+def _build_system_prompt(user_categories: List[dict], today: Optional[date] = None) -> str:
     """Buduje prompt systemowy z kategoriami i kontekstem personalnym."""
+    if today is None:
+        today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
+
     if user_categories:
         categories_text = "\n".join(
             [f"- ID {c['id']}: {c['name']}" for c in user_categories]
@@ -31,6 +35,8 @@ def _build_system_prompt(user_categories: List[dict]) -> str:
     return f"""Jesteś inteligentnym asystentem finansowym do analizy wydatków.
 Twoim zadaniem jest przetworzenie dostarczonego paragonu lub opisu wydatku i zwrócenie wyniku WYŁĄCZNIE jako obiekt JSON. Nie dodawaj żadnego tekstu przed ani po JSON.
 
+DZISIEJSZA DATA: {today_str}
+
 DOSTĘPNE KATEGORIE UŻYTKOWNIKA:
 {categories_text}
 
@@ -41,7 +47,7 @@ ZASADY:
 1. Rozpoznaj sklep/miejsce (description), datę transakcji, kwotę całkowitą i pozycje.
 2. Każda pozycja powinna mieć przypisaną kategorię z listy dostępnych (użyj ID). Jeśli nie pasuje do żadnej, użyj null.
 3. Jeśli nie jesteś pewien kategorii, w polu confidence podaj niską wartość (0.0-1.0) i ustaw needs_review na true.
-4. Data MUSI być w formacie YYYY-MM-DD. Jeśli nie znasz dokładnej daty, użyj dzisiejszej daty.
+4. Data MUSI być w formacie YYYY-MM-DD. Jeśli paragon nie zawiera daty, użyj dzisiejszej daty ({today_str}). Nigdy nie podawaj daty z przyszłości.
 5. Kwota (amount) to suma wszystkich pozycji (ilość * cena jednostkowa).
 6. Zwróć TYLKO obiekt JSON. Nie używaj markdown (```json), nie komentuj.
 
@@ -270,7 +276,7 @@ async def parse_receipt_image(
     base64_image = _encode_image_to_base64(image_path)
     mime_type = _get_mime_type_from_path(image_path)
 
-    system_prompt = _build_system_prompt(user_categories)
+    system_prompt = _build_system_prompt(user_categories, today=date.today())
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -331,7 +337,7 @@ async def parse_text_expense(
         for c in get_categories(db, user_id=user_id, include_global=True)
     ]
 
-    system_prompt = _build_system_prompt(user_categories)
+    system_prompt = _build_system_prompt(user_categories, today=current_date)
 
     user_prompt = f"""Przeanalizuj poniższy opis wydatku i zwróć wynik jako JSON.
 Dzisiaj jest {current_date.strftime("%Y-%m-%d")} ({current_date.strftime("%A")}).
