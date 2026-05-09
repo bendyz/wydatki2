@@ -1,0 +1,18 @@
+[Unit]
+Description=Wydatki 2.0 - osobisty tracker wydatków
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/wydatki:latest
+ContainerName=wydatki
+PublishPort=8000:8000
+Volume=%h/wydatki-data:/app/data:Z
+Environment=TZ=Europe/Warsaw
+
+[Service]
+Restart=always
+TimeoutStartSec=30
+
+[Install]
+WantedBy=default.target
