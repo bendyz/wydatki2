@@ -1,10 +1,14 @@
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import get_current_admin
+from app.api.v1.endpoints.auth import get_current_admin, get_current_user
 from app.core.config import settings
+from app.crud.user import delete_user, get_all_users, set_force_password_reset
+from app.db.session import get_db
+from app.schemas.user import UserAdminView
 
 router = APIRouter()
 
@@ -52,6 +56,24 @@ def _settings_to_schema() -> AdminConfigSchema:
 @router.get("/config", response_model=AdminConfigSchema, summary="Pobierz konfigurację")
 def get_config(_=Depends(get_current_admin)):
     return _settings_to_schema()
+
+
+@router.get("/users", response_model=List[UserAdminView], summary="Lista użytkowników")
+def list_users(db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    return get_all_users(db)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Usuń użytkownika")
+def remove_user(user_id: int, db: Session = Depends(get_db), current_admin=Depends(get_current_admin)):
+    if user_id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Nie możesz usunąć własnego konta")
+    delete_user(db, user_id)
+
+
+@router.post("/users/{user_id}/force-password-reset", summary="Wymuś reset hasła")
+def force_reset(user_id: int, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    set_force_password_reset(db, user_id, True)
+    return {"message": "Wymuszono reset hasła przy następnym logowaniu"}
 
 
 @router.put("/config", response_model=AdminConfigSchema, summary="Zapisz konfigurację")

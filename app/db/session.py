@@ -49,3 +49,8 @@ def init_db():
         # Upewnij się, że user id=1 jest adminem (dla istniejących baz)
         conn.execute(text("UPDATE users SET is_admin = 1 WHERE id = 1 AND is_admin = 0"))
         conn.commit()
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN DEFAULT 0 NOT NULL"))
+            conn.commit()
+        except Exception:
+            pass

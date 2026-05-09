@@ -4,6 +4,16 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=6)
+
+
+class SetPasswordRequest(BaseModel):
+    temp_token: str
+    new_password: str = Field(..., min_length=6)
+
+
 class UserBase(BaseModel):
     """Bazowy schemat użytkownika z wspólnymi polami"""
 
@@ -27,6 +37,18 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    created_at: datetime
+
+
+class UserAdminView(UserBase):
+    """Schemat użytkownika dla widoku admina"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_active: bool
+    is_admin: bool
+    force_password_reset: bool
     created_at: datetime
 
 

@@ -10,6 +10,7 @@ let currentExpensesOffset = 0;
 let currentUser = null;
 let _monthCategoryCache = {};
 let _categoryExpenseCache = {};
+let _tempResetToken = null;
 
 // ==================== AUTH ====================
 function getToken() {
@@ -71,6 +72,37 @@ async function login() {
         });
         if (!response.ok) throw new Error("Nieprawidłowy email lub hasło");
         const data = await response.json();
+        if (data.password_reset_required) {
+            _tempResetToken = data.temp_token;
+            document.getElementById("login-form").classList.add("hidden");
+            document.getElementById("register-form").classList.add("hidden");
+            document.getElementById("set-password-form").classList.remove("hidden");
+            document.getElementById("auth-error").classList.add("hidden");
+            return;
+        }
+        setToken(data.access_token);
+        initApp();
+    } catch (e) {
+        showError(e.message);
+    }
+}
+
+async function setNewPassword() {
+    const newPwd = document.getElementById("set-password-new").value;
+    const confirmPwd = document.getElementById("set-password-confirm").value;
+    if (newPwd !== confirmPwd) { showError("Hasła nie są zgodne"); return; }
+    try {
+        const response = await fetch(`${API_URL}/auth/set-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ temp_token: _tempResetToken, new_password: newPwd }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || "Błąd ustawiania hasła");
+        }
+        const data = await response.json();
+        _tempResetToken = null;
         setToken(data.access_token);
         initApp();
     } catch (e) {
@@ -108,7 +140,7 @@ function showView(viewName) {
     if (viewName === "categories") loadCategories();
     if (viewName === "subscriptions") loadSubscriptions();
     if (viewName === "stats") loadStats();
-    if (viewName === "admin") loadAdminConfig();
+    if (viewName === "admin") { loadAdminConfig(); loadAdminUsers(); }
     if (viewName === "add-expense") {
         loadCategoriesSelect();
         document.getElementById("manual-date").valueAsDate = new Date();
@@ -1100,6 +1132,74 @@ async function initApp() {
 }
 
 // ==================== ADMIN ====================
+// ==================== CHANGE PASSWORD ====================
+function openChangePasswordModal() {
+    document.getElementById("cp-old").value = "";
+    document.getElementById("cp-new").value = "";
+    document.getElementById("cp-confirm").value = "";
+    document.getElementById("change-password-modal").classList.remove("hidden");
+}
+function closeChangePasswordModal() {
+    document.getElementById("change-password-modal").classList.add("hidden");
+}
+async function changePassword() {
+    const oldPwd = document.getElementById("cp-old").value;
+    const newPwd = document.getElementById("cp-new").value;
+    const confirmPwd = document.getElementById("cp-confirm").value;
+    if (newPwd !== confirmPwd) { showToast("Nowe hasła nie są zgodne", "error"); return; }
+    try {
+        await apiRequest("POST", "/auth/change-password", { old_password: oldPwd, new_password: newPwd });
+        showToast("Hasło zmienione pomyślnie", "success");
+        closeChangePasswordModal();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+// ==================== ADMIN USERS ====================
+async function loadAdminUsers() {
+    try {
+        const users = await apiRequest("GET", "/admin/users");
+        const tbody = document.getElementById("admin-users-list");
+        tbody.innerHTML = users.map((u) => `
+            <tr>
+                <td class="px-3 py-2 text-gray-500">${u.id}</td>
+                <td class="px-3 py-2 text-gray-900">${u.email}</td>
+                <td class="px-3 py-2 text-gray-500">${u.full_name || "—"}</td>
+                <td class="px-3 py-2 text-center">${u.is_admin ? '<span class="text-primary font-semibold text-xs">admin</span>' : "—"}</td>
+                <td class="px-3 py-2 text-center">${u.force_password_reset ? '<span class="text-warning font-semibold text-xs">tak</span>' : "—"}</td>
+                <td class="px-3 py-2 text-center space-x-2 whitespace-nowrap">
+                    <button onclick="adminForcePasswordReset(${u.id})" class="text-xs text-warning hover:underline">Resetuj hasło</button>
+                    <button onclick="adminDeleteUser(${u.id}, '${u.email}')" class="text-xs text-danger hover:underline">Usuń</button>
+                </td>
+            </tr>`).join("");
+    } catch (e) {
+        showToast("Błąd ładowania użytkowników: " + e.message, "error");
+    }
+}
+
+async function adminForcePasswordReset(userId) {
+    if (!confirm("Wymusić reset hasła dla tego użytkownika? Przy kolejnym logowaniu zostanie poproszony o ustawienie nowego hasła.")) return;
+    try {
+        await apiRequest("POST", `/admin/users/${userId}/force-password-reset`);
+        showToast("Wymuszono reset hasła", "success");
+        loadAdminUsers();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+async function adminDeleteUser(userId, email) {
+    if (!confirm(`Czy na pewno usunąć użytkownika ${email}? Usunięte zostaną wszystkie jego wydatki i dane.`)) return;
+    try {
+        await apiRequest("DELETE", `/admin/users/${userId}`);
+        showToast("Użytkownik usunięty", "success");
+        loadAdminUsers();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
 async function loadAdminConfig() {
     try {
         const cfg = await apiRequest("GET", "/admin/config");

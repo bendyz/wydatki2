@@ -6,11 +6,18 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_access_token, decode_access_token, verify_password
-from app.crud.user import create_user, get_user_by_email, get_user_by_id, get_users_count
+from app.core.security import create_access_token, decode_access_token, get_password_hash, verify_password
+from app.crud.user import (
+    create_user,
+    get_user_by_email,
+    get_user_by_id,
+    get_users_count,
+    set_force_password_reset,
+    update_user_password,
+)
 from app.db.session import get_db
 from app.schemas.token import Token
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import PasswordChangeRequest, SetPasswordRequest, UserCreate, UserResponse
 
 router = APIRouter()
 
@@ -65,7 +72,6 @@ def login(
     - Weryfikuje email i hasło
     - Generuje token JWT ważny przez 24 godziny
     """
-    # Znajdź użytkownika po emailu (username w formularzu OAuth2)
     user = get_user_by_email(db, email=form_data.username)
     if not user:
         raise HTTPException(
@@ -74,7 +80,14 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Weryfikuj hasło
+    # Jeśli admin wymusił reset hasła — pomiń weryfikację i zwróć temp token
+    if user.force_password_reset:
+        temp_token = create_access_token(
+            data={"sub": str(user.id), "password_reset": True},
+            expires_delta=timedelta(minutes=15),
+        )
+        return {"password_reset_required": True, "temp_token": temp_token}
+
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,12 +95,10 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Generuj token JWT
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -140,7 +151,34 @@ def get_current_admin(current_user=Depends(get_current_user)):
     summary="Informacje o zalogowanym użytkowniku",
 )
 def read_current_user(current_user=Depends(get_current_user)):
-    """
-    Zwraca dane aktualnie zalogowanego użytkownika na podstawie tokena JWT.
-    """
     return current_user
+
+
+@router.post("/set-password", response_model=Token, summary="Ustaw nowe hasło (po wymuszonej zmianie)")
+def set_password(data: SetPasswordRequest, db: Session = Depends(get_db)):
+    payload = decode_access_token(data.temp_token)
+    if not payload or not payload.get("password_reset"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nieprawidłowy lub wygasły token resetu")
+    user_id = int(payload["sub"])
+    user = get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Użytkownik nie istnieje")
+    update_user_password(db, user_id, get_password_hash(data.new_password))
+    set_force_password_reset(db, user_id, False)
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/change-password", summary="Zmień hasło (zalogowany użytkownik)")
+def change_password(
+    data: PasswordChangeRequest,
+    current_user: Any = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(data.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nieprawidłowe obecne hasło")
+    update_user_password(db, current_user.id, get_password_hash(data.new_password))
+    return {"message": "Hasło zmienione pomyślnie"}

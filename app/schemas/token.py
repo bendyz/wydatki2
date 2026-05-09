@@ -13,8 +13,10 @@ class LoginRequest(BaseModel):
 class Token(BaseModel):
     """Schemat odpowiedzi z tokenem JWT"""
 
-    access_token: str
+    access_token: Optional[str] = None
     token_type: str = "bearer"
+    password_reset_required: bool = False
+    temp_token: Optional[str] = None
 
 
 class TokenPayload(BaseModel):
