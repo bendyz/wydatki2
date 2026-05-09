@@ -1,3 +1,25 @@
+# Python
+__pycache__/
 *.pyc
-data/*
-.venv
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Data (DB, config, uploads) — montowane jako volume w Dockerze
+data/
+
+# Migration / one-off scripts
+migrate_from_old.py
+copy_receipts.sh
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
