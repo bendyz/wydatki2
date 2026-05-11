@@ -347,7 +347,7 @@ async function deleteExpense(id) {
 
 // ==================== TAGS ====================
 let _tagsCache = [];
-let _recentTagsCache = [];
+let _popularTagsCache = [];
 
 async function loadTagsCache() {
     try {
@@ -355,10 +355,10 @@ async function loadTagsCache() {
     } catch (_) { _tagsCache = []; }
 }
 
-async function loadRecentTagsCache() {
+async function loadPopularTagsCache() {
     try {
-        _recentTagsCache = await apiRequest("GET", "/tags/?recent_days=30");
-    } catch (_) { _recentTagsCache = []; }
+        _popularTagsCache = await apiRequest("GET", "/tags/?popular=true&limit=10");
+    } catch (_) { _popularTagsCache = []; }
 }
 
 // ---- Tag suggestions dropdown ----
@@ -369,7 +369,7 @@ function _showTagDropdown(inputEl, onSelect) {
     const empty = document.getElementById("tag-dropdown-empty");
     if (!dropdown) return;
 
-    const tags = _recentTagsCache.length ? _recentTagsCache : _tagsCache;
+    const tags = _popularTagsCache.length ? _popularTagsCache : _tagsCache;
 
     if (!tags.length) {
         list.innerHTML = "";
@@ -614,7 +614,7 @@ async function saveExpenseModal() {
     try {
         await apiRequest("PUT", `/expenses/${currentEditingExpenseId}`, data);
         await _saveTagsForExpense(currentEditingExpenseId, "modal-tags-container");
-        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+        await Promise.all([loadTagsCache(), loadPopularTagsCache()]);
         showToast("Wydatek zaktualizowany!", "success");
         closeExpenseModal();
         loadExpenses();
@@ -851,7 +851,7 @@ async function saveDraftExpense() {
         if (saved && saved.id) {
             // Zapisz tagi
             await _saveTagsForExpense(saved.id, "draft-tags-container");
-            await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+            await Promise.all([loadTagsCache(), loadPopularTagsCache()]);
             // Dołącz zdjęcie paragonu
             if (currentReceiptFile) {
                 const formData = new FormData();
@@ -1345,7 +1345,7 @@ async function initApp() {
         // kontynuuj bez danych użytkownika
     }
     loadTagsCache();
-    loadRecentTagsCache();
+    loadPopularTagsCache();
     showView("dashboard");
 }
 
@@ -1421,7 +1421,7 @@ async function submitRenameTag(event, tagId) {
     if (!newName) return;
     try {
         await apiRequest("PUT", `/tags/${tagId}`, { name: newName });
-        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+        await Promise.all([loadTagsCache(), loadPopularTagsCache()]);
         loadTagsView();
         showToast("Nazwa tagu zmieniona", "success");
     } catch (e) {
@@ -1433,7 +1433,7 @@ async function deleteTagFromView(tagId, tagName) {
     if (!confirm(`Usunąć tag #${tagName}? Zostanie odłączony od wszystkich wydatków.`)) return;
     try {
         await apiRequest("DELETE", `/tags/${tagId}`);
-        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+        await Promise.all([loadTagsCache(), loadPopularTagsCache()]);
         loadTagsView();
         showToast(`Tag #${tagName} usunięty`, "success");
     } catch (e) {

@@ -22,6 +22,19 @@ def get_recent_tags(db: Session, user_id: int, days: int = 30) -> List[Tag]:
     )
 
 
+def get_popular_tags(db: Session, user_id: int, limit: int = 10) -> List[Tag]:
+    from sqlalchemy import func
+    return (
+        db.query(Tag)
+        .outerjoin(Tag.expenses)
+        .filter(Tag.user_id == user_id)
+        .group_by(Tag.id)
+        .order_by(func.count(Expense.id).desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def get_or_create_tag(db: Session, user_id: int, name: str) -> Tag:
     name = name.strip().lstrip("#").lower()
     tag = db.query(Tag).filter(Tag.user_id == user_id, Tag.name == name).first()

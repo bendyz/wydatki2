@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
-from app.crud.tag import delete_tag, get_expenses_by_tag, get_recent_tags, get_tags, get_tags_with_stats, rename_tag, set_expense_tags
+from app.crud.tag import delete_tag, get_expenses_by_tag, get_popular_tags, get_recent_tags, get_tags, get_tags_with_stats, rename_tag, set_expense_tags
 from app.crud.expense import get_expense
 from app.db.session import get_db
 from app.models.models import User
@@ -16,10 +16,14 @@ router = APIRouter()
 
 @router.get("/", response_model=List[TagResponse], summary="Lista tagów użytkownika")
 def list_tags(
-    recent_days: Optional[int] = Query(None, description="Zwróć tylko tagi użyte w ciągu ostatnich N dni"),
+    recent_days: Optional[int] = Query(None),
+    popular: bool = Query(False),
+    limit: int = Query(10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if popular:
+        return get_popular_tags(db, current_user.id, limit)
     if recent_days:
         return get_recent_tags(db, current_user.id, recent_days)
     return get_tags(db, current_user.id)
