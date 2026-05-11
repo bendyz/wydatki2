@@ -11,11 +11,16 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.crud.category import get_categories
 from app.crud.expense import get_expenses
+from app.crud.tag import get_tags
 from app.schemas.ai_draft import DraftDuplicateWarning, DraftExpenseItem, ExpenseDraft
 
 
-def _build_system_prompt(user_categories: List[dict], today: Optional[date] = None) -> str:
-    """Buduje prompt systemowy z kategoriami i kontekstem personalnym."""
+def _build_system_prompt(
+    user_categories: List[dict],
+    today: Optional[date] = None,
+    user_tags: Optional[List[str]] = None,
+) -> str:
+    """Buduje prompt systemowy z kategoriami, tagami i kontekstem personalnym."""
     if today is None:
         today = date.today()
     today_str = today.strftime("%Y-%m-%d")
@@ -31,6 +36,15 @@ def _build_system_prompt(user_categories: List[dict], today: Optional[date] = No
         context_text = "\n".join([f"- {ctx}" for ctx in settings.personal_context])
     else:
         context_text = "- Brak dodatkowego kontekstu"
+
+    if user_tags:
+        tags_text = ", ".join([f"#{t}" for t in user_tags])
+        tags_rule = f"""8. TAGI: Użytkownik ma następujące tagi: {tags_text}
+   Zaproponuj pasujące tagi w polu "suggested_tags" TYLKO jeśli masz pewność ≥ 0.7.
+   Przykład: jeśli opis to "Żabka" i istnieje tag "żabka" → dodaj go. Jeśli nie jesteś pewny — zostaw pustą listę.
+   Zwróć same nazwy tagów bez #, małymi literami."""
+    else:
+        tags_rule = "8. TAGI: Użytkownik nie ma jeszcze żadnych tagów. Pole suggested_tags zwróć jako []."
 
     return f"""Jesteś inteligentnym asystentem finansowym do analizy wydatków.
 Twoim zadaniem jest przetworzenie dostarczonego paragonu lub opisu wydatku i zwrócenie wyniku WYŁĄCZNIE jako obiekt JSON. Nie dodawaj żadnego tekstu przed ani po JSON.
@@ -50,6 +64,8 @@ ZASADY:
 4. Data MUSI być w formacie YYYY-MM-DD. Jeśli paragon nie zawiera daty, użyj dzisiejszej daty ({today_str}). Nigdy nie podawaj daty z przyszłości.
 5. Kwota (amount) to suma wszystkich pozycji (ilość * cena jednostkowa).
 6. Zwróć TYLKO obiekt JSON. Nie używaj markdown (```json), nie komentuj.
+7. NIE wymyślaj nowych tagów — korzystaj wyłącznie z listy tagów użytkownika.
+{tags_rule}
 
 FORMAT ODPOWIEDZI:
 {{
@@ -58,6 +74,7 @@ FORMAT ODPOWIEDZI:
   "date": "2025-01-15",
   "category_id": 1,
   "category_name": "Nazwa kategorii",
+  "suggested_tags": [],
   "items": [
     {{
       "name": "Nazwa produktu",
@@ -205,6 +222,7 @@ def _build_draft_from_parsed(
     ai_raw_response: Optional[str] = None,
     ai_model: Optional[str] = None,
     processing_time_ms: Optional[int] = None,
+    user_tag_names: Optional[List[str]] = None,
 ) -> ExpenseDraft:
     """Buduje obiekt ExpenseDraft z sparsowanej odpowiedzi AI."""
     items = []
@@ -240,6 +258,11 @@ def _build_draft_from_parsed(
         description=parsed.get("description"),
     )
 
+    # Filtruj sugerowane tagi — tylko te z listy użytkownika
+    raw_suggested = [t.strip().lstrip("#").lower() for t in parsed.get("suggested_tags", [])]
+    allowed_tags = set(user_tag_names or [])
+    suggested_tags = [t for t in raw_suggested if t in allowed_tags]
+
     return ExpenseDraft(
         amount=amount,
         description=parsed.get("description"),
@@ -254,6 +277,7 @@ def _build_draft_from_parsed(
         processing_time_ms=processing_time_ms,
         needs_review=parsed.get("needs_review", False) or len(items) == 0,
         user_hints=parsed.get("user_hints", []),
+        suggested_tags=suggested_tags,
     )
 
 
@@ -272,11 +296,12 @@ async def parse_receipt_image(
         {"id": c.id, "name": c.name}
         for c in get_categories(db, user_id=user_id, include_global=True)
     ]
+    user_tag_names = [t.name for t in get_tags(db, user_id)]
 
     base64_image = _encode_image_to_base64(image_path)
     mime_type = _get_mime_type_from_path(image_path)
 
-    system_prompt = _build_system_prompt(user_categories, today=date.today())
+    system_prompt = _build_system_prompt(user_categories, today=date.today(), user_tags=user_tag_names)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -312,6 +337,7 @@ async def parse_receipt_image(
         ai_raw_response=raw_response,
         ai_model=settings.openrouter.model,
         processing_time_ms=processing_time_ms,
+        user_tag_names=user_tag_names,
     )
 
 
@@ -336,8 +362,9 @@ async def parse_text_expense(
         {"id": c.id, "name": c.name}
         for c in get_categories(db, user_id=user_id, include_global=True)
     ]
+    user_tag_names = [t.name for t in get_tags(db, user_id)]
 
-    system_prompt = _build_system_prompt(user_categories, today=current_date)
+    system_prompt = _build_system_prompt(user_categories, today=current_date, user_tags=user_tag_names)
 
     user_prompt = f"""Przeanalizuj poniższy opis wydatku i zwróć wynik jako JSON.
 Dzisiaj jest {current_date.strftime("%Y-%m-%d")} ({current_date.strftime("%A")}).
@@ -365,4 +392,5 @@ Pamiętaj: zwróć TYLKO obiekt JSON."""
         ai_raw_response=raw_response,
         ai_model=settings.openrouter.model,
         processing_time_ms=processing_time_ms,
+        user_tag_names=user_tag_names,
     )

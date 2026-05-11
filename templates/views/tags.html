@@ -1,0 +1,57 @@
+<!-- Tags View -->
+<div id="view-tags" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-7">
+
+  <!-- Management panel -->
+  <div id="tags-management-panel">
+    <div class="flex items-center justify-between mb-5">
+      <h1 class="text-xl font-bold text-gray-900"><i class="fas fa-tags text-primary mr-2"></i>Zarządzanie tagami</h1>
+    </div>
+
+    <div id="tags-loading" class="text-center py-8 text-gray-400">
+      <i class="fas fa-spinner fa-spin mr-2"></i>Wczytywanie...
+    </div>
+
+    <div id="tags-table-wrap" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Wydatki</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Suma</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="tags-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+      </table>
+      <div id="tags-empty" class="hidden p-8 text-center text-gray-400">
+        <i class="fas fa-tags text-3xl mb-2 block"></i>Brak tagów. Dodaj pierwszy tag do dowolnego wydatku.
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag detail panel (hidden until tag selected) -->
+  <div id="tag-detail-panel" class="hidden">
+    <div class="flex items-center gap-3 mb-5">
+      <button onclick="closeTagDetail()" class="text-gray-400 hover:text-gray-700 p-1">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-xl font-bold text-gray-900" id="tag-detail-title"></h1>
+      <span id="tag-detail-total" class="ml-auto text-lg font-semibold text-gray-700"></span>
+    </div>
+
+    <!-- Category breakdown -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Podział na kategorie</h2>
+      <div id="tag-detail-categories" class="space-y-2"></div>
+    </div>
+
+    <!-- Expense list -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Wydatki</h2>
+      </div>
+      <div id="tag-detail-expenses" class="divide-y divide-gray-100"></div>
+    </div>
+  </div>
+
+</div>

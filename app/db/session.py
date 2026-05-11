@@ -39,7 +39,7 @@ def init_db():
     Inicjalizuje bazę danych – tworzy wszystkie tabele na podstawie modeli.
     Wywoływane przy starcie aplikacji.
     """
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)  # tworzy nowe tabele (tags, expense_tags)
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0 NOT NULL"))

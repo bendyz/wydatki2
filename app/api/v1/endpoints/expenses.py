@@ -58,13 +58,11 @@ def list_expenses(
     item_category_id: Optional[int] = None,
     start_date: Optional[datetime.date] = None,
     end_date: Optional[datetime.date] = None,
+    search: Optional[str] = None,
+    search_items: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Zwraca listę wydatków użytkownika z opcjonalnym filtrowaniem.
-    Można filtrować po kategorii ogólnej lub kategorii pozycji (item).
-    """
     expenses = get_expenses(
         db,
         user_id=current_user.id,
@@ -74,6 +72,8 @@ def list_expenses(
         item_category_id=item_category_id,
         start_date=start_date,
         end_date=end_date,
+        search=search,
+        search_items=search_items,
     )
     return expenses
 

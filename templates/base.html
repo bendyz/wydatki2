@@ -67,6 +67,9 @@
                     <button onclick="showView('stats')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                         <i class="fas fa-chart-bar mr-1"></i> Statystyki
                     </button>
+                    <button onclick="showView('tags')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-hashtag mr-1"></i> Tagi
+                    </button>
                     <button id="nav-admin-btn" onclick="showView('admin')" class="hidden nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                         <i class="fas fa-cog mr-1"></i> Admin
                     </button>
@@ -102,6 +105,9 @@
                 </button>
                 <button onclick="showView('stats'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                     <i class="fas fa-chart-bar mr-2"></i> Statystyki
+                </button>
+                <button onclick="showView('tags'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-hashtag mr-2"></i> Tagi
                 </button>
                 <button id="nav-admin-btn-mobile" onclick="showView('admin'); toggleMobileMenu()" class="hidden block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                     <i class="fas fa-cog mr-2"></i> Admin
@@ -152,6 +158,13 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Global tag suggestions dropdown -->
+    <div id="tag-dropdown" class="hidden fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64">
+      <p class="text-xs text-gray-400 mb-2"><i class="fas fa-clock mr-1"></i>Ostatni miesiąc:</p>
+      <div id="tag-dropdown-list" class="flex flex-wrap gap-1.5"></div>
+      <p id="tag-dropdown-empty" class="hidden text-xs text-gray-400 italic">Brak tagów z ostatniego miesiąca</p>
     </div>
 
     <script src="{{ url_for('static', path='js/app.js') }}"></script>

@@ -52,10 +52,30 @@
           <option value="">Wszystkie</option>
         </select>
       </div>
-      <button onclick="loadExpenses()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-        <i class="fas fa-filter mr-1"></i> Filtruj
-      </button>
+      <div class="flex-1 min-w-[180px]">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Szukaj</label>
+        <input type="text" id="filter-search" placeholder="opis lub #hashtag"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          onkeydown="if(event.key==='Enter'){_hideTagDropdown();loadExpenses();}"
+          onfocus="_showTagDropdown(this, n => { this.value='#'+n; _hideTagDropdown(); loadExpenses(); })"
+          onblur="_hideTagDropdown()" />
+      </div>
+      <div class="flex flex-col gap-1 justify-end pb-0.5">
+        <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none whitespace-nowrap">
+          <input type="checkbox" id="filter-search-items" class="rounded border-gray-300 text-primary" />
+          szukaj w pozycjach
+        </label>
+        <button onclick="loadExpenses()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+          <i class="fas fa-filter mr-1"></i> Filtruj
+        </button>
+      </div>
     </div>
+  </div>
+
+  <!-- Filter summary -->
+  <div id="filter-summary" class="hidden mb-3 px-1 flex items-center justify-between text-sm text-gray-600">
+    <span id="filter-summary-count"></span>
+    <span class="font-semibold text-gray-900"><span id="filter-summary-total"></span> zł</span>
   </div>
 
   <!-- Expenses list -->
@@ -133,6 +153,22 @@
               <i class="fas fa-plus mr-1"></i>Dodaj pozycję
             </button>
           </div>
+          <!-- Tags -->
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Tagi</label>
+            <div id="modal-tags-container" class="flex flex-wrap gap-1 mb-2 min-h-[24px]"></div>
+            <div class="flex gap-2">
+              <input id="modal-tag-input" type="text" placeholder="#żabka, #rzym2026..."
+                class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                list="modal-tags-datalist"
+                onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault();addTagFromInput();}"
+                onfocus="_showTagDropdown(this, n => { _renderTagChip(n,'modal-tags-container'); _hideTagDropdown(); })"
+                onblur="_hideTagDropdown()" />
+              <datalist id="modal-tags-datalist"></datalist>
+              <button onclick="addTagFromInput()" class="text-sm text-primary hover:underline px-2">Dodaj</button>
+            </div>
+          </div>
+
           <!-- Receipt image -->
           <div id="modal-receipt-section" class="hidden">
             <label class="block text-xs font-medium text-gray-500 mb-2">Zdjęcie paragonu</label>

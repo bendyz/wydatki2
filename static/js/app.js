@@ -141,6 +141,7 @@ function showView(viewName) {
     if (viewName === "subscriptions") loadSubscriptions();
     if (viewName === "stats") loadStats();
     if (viewName === "admin") { loadAdminConfig(); loadAdminUsers(); }
+    if (viewName === "tags") loadTagsView();
     if (viewName === "add-expense") {
         loadCategoriesSelect();
         document.getElementById("manual-date").valueAsDate = new Date();
@@ -153,16 +154,8 @@ function toggleMobileMenu() {
 
 // ==================== DASHBOARD ====================
 async function loadDashboard() {
-    currentExpensesOffset = 0;
-    try {
-        const expenses = await apiRequest("GET", `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=0`);
-        currentExpenses = expenses;
-        renderExpenses(expenses);
-        setLoadMoreVisible(expenses.length === EXPENSES_PER_PAGE);
-        loadCategoriesSelect("filter-category");
-    } catch (e) {
-        showToast(e.message, "error");
-    }
+    await loadCategoriesSelect("filter-category");
+    await loadExpenses();
 }
 
 async function loadMoreExpenses() {
@@ -170,10 +163,14 @@ async function loadMoreExpenses() {
     const start = document.getElementById("filter-start").value;
     const end = document.getElementById("filter-end").value;
     const cat = document.getElementById("filter-category").value;
+    const search = (document.getElementById("filter-search")?.value || "").trim();
+    const searchItems = document.getElementById("filter-search-items")?.checked;
     let url = `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=${currentExpensesOffset}`;
     if (start) url += `&start_date=${start}`;
     if (end) url += `&end_date=${end}`;
     if (cat) url += `&category_id=${cat}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (search && searchItems) url += `&search_items=true`;
     try {
         const more = await apiRequest("GET", url);
         currentExpenses = [...currentExpenses, ...more];
@@ -187,6 +184,20 @@ async function loadMoreExpenses() {
 function setLoadMoreVisible(visible) {
     const el = document.getElementById("load-more-container");
     if (el) el.classList.toggle("hidden", !visible);
+    updateFilterSummary(visible);
+}
+
+function updateFilterSummary(hasMore) {
+    const summary = document.getElementById("filter-summary");
+    if (!summary) return;
+    if (!currentExpenses.length) { summary.classList.add("hidden"); return; }
+    const total = currentExpenses.reduce((s, e) => s + e.amount, 0);
+    const n = currentExpenses.length;
+    const suffix = hasMore ? "+" : "";
+    const label = n === 1 ? "wydatek" : n < 5 ? "wydatki" : "wydatków";
+    document.getElementById("filter-summary-count").textContent = `${n}${suffix} ${label}`;
+    document.getElementById("filter-summary-total").textContent = total.toFixed(2);
+    summary.classList.remove("hidden");
 }
 
 // ==================== DASHBOARD AI QUICK ADD ====================
@@ -235,6 +246,7 @@ function renderExpenses(expenses) {
     currentExpenses = expenses;
     const tbody = document.getElementById("expenses-list");
     const mobileDiv = document.getElementById("expenses-list-mobile");
+
     if (!expenses.length) {
         const empty = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak wydatków</td></tr>';
         tbody.innerHTML = empty;
@@ -246,7 +258,10 @@ function renderExpenses(expenses) {
     tbody.innerHTML = expenses.map((e) => `
         <tr class="hover:bg-gray-50 cursor-pointer" onclick="openExpenseModal(${e.id})">
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${e.date}</td>
-            <td class="px-4 py-3 text-sm text-gray-900">${e.description || "-"}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">
+                ${e.description || "-"}
+                ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("")}</div>` : ""}
+            </td>
             <td class="px-4 py-3 text-sm text-gray-500">${e.category_name || "-"}</td>
             <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
             <td class="px-4 py-3 text-center text-sm whitespace-nowrap">
@@ -272,6 +287,7 @@ function renderExpenses(expenses) {
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-gray-900 truncate">${e.description || "Bez opisu"}</p>
                     <p class="text-xs text-gray-500">${e.date} · ${e.category_name || "-"}</p>
+                    ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("")}</div>` : ""}
                 </div>
                 <div class="text-right ml-3">
                     <p class="text-sm font-bold text-gray-900">${e.amount.toFixed(2)} zł</p>
@@ -300,10 +316,14 @@ async function loadExpenses() {
     const start = document.getElementById("filter-start").value;
     const end = document.getElementById("filter-end").value;
     const cat = document.getElementById("filter-category").value;
+    const search = (document.getElementById("filter-search")?.value || "").trim();
+    const searchItems = document.getElementById("filter-search-items")?.checked;
     let url = `/expenses/?limit=${EXPENSES_PER_PAGE}&skip=0`;
     if (start) url += `&start_date=${start}`;
     if (end) url += `&end_date=${end}`;
     if (cat) url += `&category_id=${cat}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (search && searchItems) url += `&search_items=true`;
     try {
         const expenses = await apiRequest("GET", url);
         currentExpenses = expenses;
@@ -318,19 +338,132 @@ async function deleteExpense(id) {
     if (!confirm("Usunąć wydatek?")) return;
     try {
         await apiRequest("DELETE", `/expenses/${id}`);
-        loadDashboard();
+        loadExpenses();
         showToast("Wydatek usunięty", "success");
     } catch (e) {
         showToast(e.message, "error");
     }
 }
 
+// ==================== TAGS ====================
+let _tagsCache = [];
+let _recentTagsCache = [];
+
+async function loadTagsCache() {
+    try {
+        _tagsCache = await apiRequest("GET", "/tags/");
+    } catch (_) { _tagsCache = []; }
+}
+
+async function loadRecentTagsCache() {
+    try {
+        _recentTagsCache = await apiRequest("GET", "/tags/?recent_days=30");
+    } catch (_) { _recentTagsCache = []; }
+}
+
+// ---- Tag suggestions dropdown ----
+
+function _showTagDropdown(inputEl, onSelect) {
+    const dropdown = document.getElementById("tag-dropdown");
+    const list = document.getElementById("tag-dropdown-list");
+    const empty = document.getElementById("tag-dropdown-empty");
+    if (!dropdown) return;
+
+    const tags = _recentTagsCache.length ? _recentTagsCache : _tagsCache;
+
+    if (!tags.length) {
+        list.innerHTML = "";
+        empty.classList.remove("hidden");
+    } else {
+        empty.classList.add("hidden");
+        list.innerHTML = tags.map(t =>
+            `<button class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full hover:bg-blue-200 transition-colors"
+                     data-tagname="${escapeHtml(t.name)}"
+                     onmousedown="event.preventDefault(); _tagDropdownPick(this.dataset.tagname)">#${escapeHtml(t.name)}</button>`
+        ).join("");
+    }
+
+    dropdown._onSelect = onSelect;
+
+    const rect = inputEl.getBoundingClientRect();
+    dropdown.style.top = (rect.bottom + 4) + "px";
+    dropdown.style.left = rect.left + "px";
+    dropdown.style.width = Math.max(rect.width, 220) + "px";
+    dropdown.classList.remove("hidden");
+}
+
+function _hideTagDropdown() {
+    document.getElementById("tag-dropdown")?.classList.add("hidden");
+}
+
+function _tagDropdownPick(tagName) {
+    const dropdown = document.getElementById("tag-dropdown");
+    if (dropdown?._onSelect) dropdown._onSelect(tagName);
+    _hideTagDropdown();
+}
+
+function _renderTagChip(name, containerId, removable = true) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    // Nie dodawaj duplikatu
+    const existing = [...container.querySelectorAll("[data-tag]")].map(el => el.dataset.tag);
+    if (existing.includes(name)) return;
+    const chip = document.createElement("span");
+    chip.dataset.tag = name;
+    chip.className = "inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full";
+    chip.innerHTML = `#${escapeHtml(name)}${removable ? ` <button onclick="this.parentElement.remove()" class="text-blue-600 hover:text-blue-900 ml-0.5">&times;</button>` : ""}`;
+    container.appendChild(chip);
+}
+
+function _getTagsFromContainer(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return [...container.querySelectorAll("[data-tag]")].map(el => el.dataset.tag);
+}
+
+function _fillTagsDatalist(datalistId) {
+    const dl = document.getElementById(datalistId);
+    if (!dl) return;
+    dl.innerHTML = _tagsCache.map(t => `<option value="#${t.name}">`).join("");
+}
+
+function _addTagToContainer(inputId, containerId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const raw = input.value.trim().replace(/^#+/, "").toLowerCase();
+    if (raw) { _renderTagChip(raw, containerId); }
+    input.value = "";
+}
+
+function addTagFromInput() { _addTagToContainer("modal-tag-input", "modal-tags-container"); }
+function addDraftTagFromInput() { _addTagToContainer("draft-tag-input", "draft-tags-container"); }
+
+async function _saveTagsForExpense(expenseId, containerId) {
+    // Flush any text still sitting in the associated input
+    const inputId = containerId === "modal-tags-container" ? "modal-tag-input" : "draft-tag-input";
+    _addTagToContainer(inputId, containerId);
+
+    const tagNames = _getTagsFromContainer(containerId);
+    try {
+        await apiRequest("PUT", `/tags/expenses/${expenseId}`, tagNames);
+    } catch (e) {
+        showToast("Błąd zapisu tagów: " + e.message, "error");
+    }
+}
+
 // ==================== EXPENSE MODAL (EDIT / VIEW) ====================
 let currentReceiptBlobUrl = null;
 
-function openExpenseModal(expenseId) {
-    const expense = currentExpenses.find((e) => e.id === expenseId);
-    if (!expense) return;
+async function openExpenseModal(expenseId) {
+    let expense = currentExpenses.find((e) => e.id === expenseId);
+    if (!expense) {
+        try {
+            expense = await apiRequest("GET", `/expenses/${expenseId}`);
+        } catch (e) {
+            showToast("Nie można wczytać wydatku", "error");
+            return;
+        }
+    }
     currentEditingExpenseId = expenseId;
 
     document.getElementById("modal-amount").value = expense.amount;
@@ -357,6 +490,13 @@ function openExpenseModal(expenseId) {
         itemsList.innerHTML = "";
     }
     updateModalItemsTotal();
+
+    // Tags
+    const tagsContainer = document.getElementById("modal-tags-container");
+    tagsContainer.innerHTML = "";
+    (expense.tags || []).forEach(t => _renderTagChip(t.name, "modal-tags-container"));
+    document.getElementById("modal-tag-input").value = "";
+    _fillTagsDatalist("modal-tags-datalist");
 
     // Receipt image
     if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
@@ -473,9 +613,11 @@ async function saveExpenseModal() {
 
     try {
         await apiRequest("PUT", `/expenses/${currentEditingExpenseId}`, data);
+        await _saveTagsForExpense(currentEditingExpenseId, "modal-tags-container");
+        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
         showToast("Wydatek zaktualizowany!", "success");
         closeExpenseModal();
-        loadDashboard();
+        loadExpenses();
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -487,7 +629,7 @@ async function deleteExpenseModal() {
     try {
         await apiRequest("DELETE", `/expenses/${currentEditingExpenseId}`);
         closeExpenseModal();
-        loadDashboard();
+        loadExpenses();
         showToast("Wydatek usunięty", "success");
     } catch (e) {
         showToast(e.message, "error");
@@ -640,6 +782,24 @@ function showDraft(draft) {
         document.getElementById("draft-items-section").classList.add("hidden");
     }
 
+    // Tags
+    document.getElementById("draft-tags-container").innerHTML = "";
+    document.getElementById("draft-tag-input").value = "";
+    _fillTagsDatalist("draft-tags-datalist");
+
+    const suggestedDiv = document.getElementById("draft-suggested-tags");
+    const suggestedList = document.getElementById("draft-suggested-tags-list");
+    if (draft.suggested_tags && draft.suggested_tags.length) {
+        suggestedDiv.classList.remove("hidden");
+        suggestedList.innerHTML = draft.suggested_tags.map(t => `
+            <button onclick="this.classList.toggle('ring-2'); _renderTagChip('${t}', 'draft-tags-container')"
+                class="inline-flex items-center bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full hover:bg-blue-100 transition-colors">
+                #${escapeHtml(t)} <i class="fas fa-plus ml-1 text-[10px]"></i>
+            </button>`).join("");
+    } else {
+        suggestedDiv.classList.add("hidden");
+    }
+
     if (draft.user_hints && draft.user_hints.length) {
         draft.user_hints.forEach((h) => showToast(h, "warning"));
     }
@@ -688,19 +848,24 @@ async function saveDraftExpense() {
 
     try {
         const saved = await apiRequest("POST", "/expenses/", data);
-        // Dołącz zdjęcie paragonu jeśli było użyte do analizy
-        if (currentReceiptFile && saved && saved.id) {
-            const formData = new FormData();
-            formData.append("file", currentReceiptFile);
-            await fetch(`${API_URL}/receipts/${saved.id}/receipt`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${getToken()}` },
-                body: formData,
-            }).catch(() => {});
+        if (saved && saved.id) {
+            // Zapisz tagi
+            await _saveTagsForExpense(saved.id, "draft-tags-container");
+            await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+            // Dołącz zdjęcie paragonu
+            if (currentReceiptFile) {
+                const formData = new FormData();
+                formData.append("file", currentReceiptFile);
+                await fetch(`${API_URL}/receipts/${saved.id}/receipt`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${getToken()}` },
+                    body: formData,
+                }).catch(() => {});
+            }
         }
         showToast("Wydatek zapisany!", "success");
         discardDraft();
-        loadDashboard();
+        loadExpenses();
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -1179,7 +1344,164 @@ async function initApp() {
     } catch (e) {
         // kontynuuj bez danych użytkownika
     }
+    loadTagsCache();
+    loadRecentTagsCache();
     showView("dashboard");
+}
+
+// ==================== TAG MANAGEMENT VIEW ====================
+let _tagStatsCache = [];
+
+async function loadTagsView() {
+    document.getElementById("tags-management-panel").classList.remove("hidden");
+    document.getElementById("tag-detail-panel").classList.add("hidden");
+    document.getElementById("tags-loading").classList.remove("hidden");
+    document.getElementById("tags-table-wrap").classList.add("hidden");
+
+    try {
+        _tagStatsCache = await apiRequest("GET", "/tags/stats");
+    } catch (e) {
+        showToast(e.message, "error");
+        return;
+    }
+
+    document.getElementById("tags-loading").classList.add("hidden");
+    document.getElementById("tags-table-wrap").classList.remove("hidden");
+
+    const tbody = document.getElementById("tags-table-body");
+    const empty = document.getElementById("tags-empty");
+
+    if (!_tagStatsCache.length) {
+        empty.classList.remove("hidden");
+        tbody.innerHTML = "";
+        return;
+    }
+    empty.classList.add("hidden");
+
+    tbody.innerHTML = _tagStatsCache.map(t => `
+        <tr class="hover:bg-gray-50" id="tag-row-${t.id}">
+            <td class="px-4 py-3 text-sm font-medium">
+                <button onclick="openTagDetail('${escapeHtml(t.name)}')"
+                    class="text-primary hover:underline font-medium">#${escapeHtml(t.name)}</button>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-600 text-right">${t.expense_count}</td>
+            <td class="px-4 py-3 text-sm text-gray-900 font-medium text-right">${t.total_amount.toFixed(2)} zł</td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button onclick="startRenameTag(${t.id}, '${escapeHtml(t.name)}')"
+                    class="text-gray-400 hover:text-primary mr-3" title="Zmień nazwę">
+                    <i class="fas fa-pen text-xs"></i>
+                </button>
+                <button onclick="deleteTagFromView(${t.id}, '${escapeHtml(t.name)}')"
+                    class="text-gray-400 hover:text-danger" title="Usuń">
+                    <i class="fas fa-trash text-xs"></i>
+                </button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function startRenameTag(tagId, currentName) {
+    const row = document.getElementById(`tag-row-${tagId}`);
+    const nameTd = row.querySelector("td:first-child");
+    nameTd.innerHTML = `
+        <form onsubmit="submitRenameTag(event, ${tagId})" class="flex items-center gap-2">
+            <input type="text" value="${escapeHtml(currentName)}" id="rename-input-${tagId}"
+                class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-36"
+                onkeydown="if(event.key==='Escape') loadTagsView()" />
+            <button type="submit" class="text-success hover:text-green-700 text-xs"><i class="fas fa-check"></i></button>
+            <button type="button" onclick="loadTagsView()" class="text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+        </form>`;
+    document.getElementById(`rename-input-${tagId}`).focus();
+}
+
+async function submitRenameTag(event, tagId) {
+    event.preventDefault();
+    const input = document.getElementById(`rename-input-${tagId}`);
+    const newName = input.value.trim();
+    if (!newName) return;
+    try {
+        await apiRequest("PUT", `/tags/${tagId}`, { name: newName });
+        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+        loadTagsView();
+        showToast("Nazwa tagu zmieniona", "success");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+async function deleteTagFromView(tagId, tagName) {
+    if (!confirm(`Usunąć tag #${tagName}? Zostanie odłączony od wszystkich wydatków.`)) return;
+    try {
+        await apiRequest("DELETE", `/tags/${tagId}`);
+        await Promise.all([loadTagsCache(), loadRecentTagsCache()]);
+        loadTagsView();
+        showToast(`Tag #${tagName} usunięty`, "success");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+// ---- Tag detail ----
+
+async function openTagDetail(tagName) {
+    document.getElementById("tags-management-panel").classList.add("hidden");
+    document.getElementById("tag-detail-panel").classList.remove("hidden");
+    document.getElementById("tag-detail-title").textContent = `#${tagName}`;
+    document.getElementById("tag-detail-total").textContent = "";
+    document.getElementById("tag-detail-categories").innerHTML =
+        '<div class="text-sm text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i>Wczytywanie...</div>';
+    document.getElementById("tag-detail-expenses").innerHTML = "";
+
+    let expenses;
+    try {
+        expenses = await apiRequest("GET", `/tags/expenses?tag=${encodeURIComponent(tagName)}`);
+    } catch (e) {
+        showToast(e.message, "error");
+        return;
+    }
+
+    const total = expenses.reduce((s, e) => s + e.amount, 0);
+    document.getElementById("tag-detail-total").textContent =
+        `${expenses.length} wydatk${expenses.length === 1 ? "" : expenses.length < 5 ? "i" : "ów"} · ${total.toFixed(2)} zł`;
+
+    // Category breakdown
+    const catMap = {};
+    expenses.forEach(e => {
+        const key = e.category_name || "Bez kategorii";
+        catMap[key] = (catMap[key] || 0) + e.amount;
+    });
+    const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+    const maxVal = sorted[0]?.[1] || 1;
+    document.getElementById("tag-detail-categories").innerHTML = sorted.map(([name, amount]) => `
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-600 w-32 truncate shrink-0">${escapeHtml(name)}</span>
+            <div class="flex-1 bg-gray-100 rounded-full h-2">
+                <div class="bg-primary h-2 rounded-full" style="width:${(amount / maxVal * 100).toFixed(1)}%"></div>
+            </div>
+            <span class="text-sm font-medium text-gray-900 w-24 text-right shrink-0">${amount.toFixed(2)} zł</span>
+        </div>
+    `).join("") || '<p class="text-sm text-gray-400 italic">Brak danych</p>';
+
+    // Expense list
+    document.getElementById("tag-detail-expenses").innerHTML = expenses.map(e => `
+        <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">${escapeHtml(e.description || "Bez opisu")}</p>
+                <p class="text-xs text-gray-500">${e.date} · ${e.category_name || "—"}</p>
+            </div>
+            <div class="flex items-center gap-4 ml-3 shrink-0">
+                <span class="text-sm font-semibold text-gray-900">${e.amount.toFixed(2)} zł</span>
+                <button onclick="openExpenseModal(${e.id})" class="text-primary hover:text-blue-700 text-xs">
+                    <i class="fas fa-pen"></i>
+                </button>
+            </div>
+        </div>
+    `).join("") || '<div class="p-4 text-center text-sm text-gray-400">Brak wydatków</div>';
+}
+
+function closeTagDetail() {
+    document.getElementById("tag-detail-panel").classList.add("hidden");
+    document.getElementById("tags-management-panel").classList.remove("hidden");
 }
 
 // ==================== ADMIN ====================

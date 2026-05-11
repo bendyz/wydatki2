@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.tag import TagResponse
+
 
 class ExpenseItemBase(BaseModel):
     """Bazowy schemat pozycji wydatku (produkt na paragonie)"""
@@ -79,3 +81,4 @@ class ExpenseResponse(ExpenseBase):
     items: List[ExpenseItemResponse] = Field(
         default_factory=list, description="Rozszerzone pozycje wydatku"
     )
+    tags: List[TagResponse] = Field(default_factory=list)

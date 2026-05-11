@@ -89,6 +89,12 @@ class ExpenseDraft(BaseModel):
         description="True jeśli AI ma niską pewność – zalecana weryfikacja użytkownika",
     )
 
+    # Tagi zaproponowane przez AI (tylko jeśli pewność ≥ 0.7)
+    suggested_tags: List[str] = Field(
+        default_factory=list,
+        description="Tagi zaproponowane przez AI z istniejącej listy tagów użytkownika",
+    )
+
     # Sugestie dla użytkownika
     user_hints: List[str] = Field(
         default_factory=list,

@@ -3,7 +3,9 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.models import Expense, ExpenseItem
+from sqlalchemy.orm import joinedload
+
+from app.models.models import Expense, ExpenseItem, Tag
 
 
 def get_expense(db: Session, expense_id: int, user_id: int) -> Optional[Expense]:
@@ -34,23 +36,9 @@ def get_expenses(
     item_category_id: Optional[int] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    search: Optional[str] = None,
+    search_items: bool = False,
 ) -> List[Expense]:
-    """
-    Pobiera listę wydatków użytkownika z opcjonalnym filtrowaniem.
-
-    Args:
-        db: Sesja bazy danych SQLAlchemy
-        user_id: ID właściciela
-        skip: Ilość rekordów do pominięcia (paginacja)
-        limit: Maksymalna ilość rekordów
-        category_id: Opcjonalne filtrowanie po kategorii ogólnej wydatku
-        item_category_id: Opcjonalne filtrowanie po kategorii pozycji (item)
-        start_date: Opcjonalne filtrowanie od daty (YYYY-MM-DD)
-        end_date: Opcjonalne filtrowanie do daty (YYYY-MM-DD)
-
-    Returns:
-        Lista obiektów Expense posortowana malejąco po dacie
-    """
     query = db.query(Expense).filter(Expense.user_id == user_id)
 
     if category_id is not None:
@@ -65,6 +53,27 @@ def get_expenses(
         query = query.filter(Expense.date >= start_date)
     if end_date is not None:
         query = query.filter(Expense.date <= end_date)
+
+    if search:
+        tag_name = search.lstrip("#").lower()
+        if search.startswith("#"):
+            # szukaj po tagu
+            query = query.join(Expense.tags).filter(Tag.name == tag_name)
+        elif search_items:
+            # szukaj w opisie wydatku LUB w pozycjach
+            from sqlalchemy import or_
+            query = (
+                query.outerjoin(ExpenseItem)
+                .filter(
+                    or_(
+                        Expense.description.ilike(f"%{search}%"),
+                        ExpenseItem.name.ilike(f"%{search}%"),
+                    )
+                )
+                .distinct()
+            )
+        else:
+            query = query.filter(Expense.description.ilike(f"%{search}%"))
 
     return query.order_by(Expense.date.desc()).offset(skip).limit(limit).all()
 

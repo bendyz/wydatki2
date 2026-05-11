@@ -9,10 +9,30 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Table,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
+
+# Many-to-many: expenses ↔ tags
+expense_tags = Table(
+    "expense_tags",
+    Base.metadata,
+    Column("expense_id", Integer, ForeignKey("expenses.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    user = relationship("User", back_populates="tags")
+    expenses = relationship("Expense", secondary=expense_tags, back_populates="tags")
 
 
 class User(Base):
@@ -31,6 +51,7 @@ class User(Base):
     expenses = relationship("Expense", back_populates="user")
     subscriptions = relationship("Subscription", back_populates="user")
     categories = relationship("Category", back_populates="user")
+    tags = relationship("Tag", back_populates="user")
 
 
 class Category(Base):
@@ -67,6 +88,7 @@ class Expense(Base):
     user = relationship("User", back_populates="expenses")
     category = relationship("Category", back_populates="expenses")
     items = relationship("ExpenseItem", back_populates="expense")
+    tags = relationship("Tag", secondary=expense_tags, back_populates="expenses")
 
     @property
     def category_name(self):
