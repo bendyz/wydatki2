@@ -22,12 +22,13 @@ def get_recent_tags(db: Session, user_id: int, days: int = 30) -> List[Tag]:
     )
 
 
-def get_popular_tags(db: Session, user_id: int, limit: int = 10) -> List[Tag]:
+def get_popular_tags(db: Session, user_id: int, limit: int = 10, months: int = 4) -> List[Tag]:
     from sqlalchemy import func
+    cutoff = date.today() - timedelta(days=months * 30)
     return (
         db.query(Tag)
-        .outerjoin(Tag.expenses)
-        .filter(Tag.user_id == user_id)
+        .join(Tag.expenses)
+        .filter(Tag.user_id == user_id, Expense.date >= cutoff)
         .group_by(Tag.id)
         .order_by(func.count(Expense.id).desc())
         .limit(limit)
