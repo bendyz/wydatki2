@@ -1,10 +1,11 @@
 import csv
+from collections import defaultdict
 from datetime import date, timedelta
 from io import StringIO
 from typing import List, Optional
 
 from sqlalchemy import extract, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.models import Category, Expense, ExpenseItem
 
@@ -93,35 +94,55 @@ def get_stats(
         for m in monthly_data
     ]
 
-    # Category summary
-    category_data = (
-        db.query(
-            Expense.category_id,
-            Category.name.label("category_name"),
-            func.sum(Expense.amount).label("total"),
-            func.count(Expense.id).label("count"),
+    # Category summary — item-aware:
+    # jeśli wydatek ma pozycje, liczymy po kategoriach pozycji;
+    # jeśli nie ma, bierzemy kategorię nagłówka wydatku.
+    expenses_for_cats = (
+        base_query
+        .options(
+            joinedload(Expense.items).joinedload(ExpenseItem.category),
+            joinedload(Expense.category),
         )
-        .outerjoin(Category, Expense.category_id == Category.id)
-        .filter(
-            Expense.user_id == user_id,
-            Expense.date >= start_date,
-            Expense.date <= end_date,
-        )
-        .group_by(Expense.category_id, Category.name)
-        .order_by(func.sum(Expense.amount).desc())
         .all()
     )
 
+    cat_data = defaultdict(lambda: {"name": None, "total": 0.0, "expense_ids": set()})
+
+    for expense in expenses_for_cats:
+        if expense.items:
+            for item in expense.items:
+                item_amount = round(item.price * item.quantity, 4)
+                cid = item.category_id
+                cname = item.category.name if item.category else None
+                cat_data[cid]["name"] = cname
+                cat_data[cid]["total"] += item_amount
+                cat_data[cid]["expense_ids"].add(expense.id)
+            # Rozbieżność (rabaty / zaokrąglenia) → kategoria nagłówka
+            items_sum = sum(item.price * item.quantity for item in expense.items)
+            discrepancy = expense.amount - items_sum
+            if abs(discrepancy) > 0.005:
+                cid = expense.category_id
+                cname = expense.category.name if expense.category else None
+                cat_data[cid]["name"] = cname
+                cat_data[cid]["total"] += discrepancy
+                cat_data[cid]["expense_ids"].add(expense.id)
+        else:
+            cid = expense.category_id
+            cname = expense.category.name if expense.category else None
+            cat_data[cid]["name"] = cname
+            cat_data[cid]["total"] += expense.amount
+            cat_data[cid]["expense_ids"].add(expense.id)
+
     category_summary = []
-    for c in category_data:
-        percentage = (float(c.total) / total_amount * 100) if total_amount > 0 else 0.0
+    for cid, data in sorted(cat_data.items(), key=lambda x: -x[1]["total"]):
+        percentage = (data["total"] / total_amount * 100) if total_amount > 0 else 0.0
         category_summary.append(
             {
-                "category_id": c.category_id,
-                "category_name": c.category_name or "Bez kategorii",
-                "total_amount": float(c.total),
+                "category_id": cid,
+                "category_name": data["name"] or "Bez kategorii",
+                "total_amount": round(data["total"], 2),
                 "percentage": round(percentage, 2),
-                "expense_count": int(c.count),
+                "expense_count": len(data["expense_ids"]),
             }
         )
 
