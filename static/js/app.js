@@ -787,17 +787,67 @@ async function loadSubscriptions() {
     try {
         const subs = await apiRequest("GET", "/subscriptions/");
         const tbody = document.getElementById("subscriptions-list");
-        tbody.innerHTML = subs.map((s) => `
-            <tr>
-                <td class="px-4 py-3 text-sm text-gray-900">${escapeHtml(s.name)}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${s.next_billing_date}</td>
-                <td class="px-4 py-3 text-right text-sm">
-                    <button onclick="deleteSubscription(${s.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `).join("");
+        if (!subs.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak abonamentów</td></tr>';
+        } else {
+            tbody.innerHTML = subs.map((s) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm text-gray-900 font-medium">${escapeHtml(s.name)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
+                    <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">co ${s.frequency_days} dni</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${s.next_billing_date}</td>
+                    <td class="px-4 py-3 text-right text-sm">
+                        <button onclick="openSubModal(${s.id})" class="text-primary hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteSubscription(${s.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join("");
+        }
         loadCategoriesSelect("sub-category");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+async function openSubModal(id) {
+    try {
+        const s = await apiRequest("GET", `/subscriptions/${id}`);
+        document.getElementById("sub-modal-id").value = s.id;
+        document.getElementById("sub-modal-name").value = s.name;
+        document.getElementById("sub-modal-amount").value = s.amount;
+        document.getElementById("sub-modal-frequency").value = s.frequency_days;
+        document.getElementById("sub-modal-next").value = s.next_billing_date;
+        document.getElementById("sub-modal-end").value = s.end_date || "";
+        document.getElementById("sub-modal-installments").value = s.remaining_installments || "";
+        await loadCategoriesSelect("sub-modal-category");
+        document.getElementById("sub-modal-category").value = s.category_id || "";
+        document.getElementById("sub-modal").classList.remove("hidden");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+function closeSubModal() {
+    document.getElementById("sub-modal").classList.add("hidden");
+}
+
+async function saveSubModal() {
+    const id = document.getElementById("sub-modal-id").value;
+    const installmentsVal = document.getElementById("sub-modal-installments").value;
+    const data = {
+        name: document.getElementById("sub-modal-name").value,
+        amount: parseFloat(document.getElementById("sub-modal-amount").value),
+        frequency_days: parseInt(document.getElementById("sub-modal-frequency").value),
+        next_billing_date: document.getElementById("sub-modal-next").value,
+        end_date: document.getElementById("sub-modal-end").value || null,
+        remaining_installments: installmentsVal ? parseInt(installmentsVal) : null,
+        category_id: document.getElementById("sub-modal-category").value || null,
+    };
+    try {
+        await apiRequest("PUT", `/subscriptions/${id}`, data);
+        closeSubModal();
+        loadSubscriptions();
+        showToast("Abonament zaktualizowany", "success");
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -835,6 +885,7 @@ async function deleteSubscription(id) {
     if (!confirm("Usunąć abonament?")) return;
     try {
         await apiRequest("DELETE", `/subscriptions/${id}`);
+        closeSubModal();
         loadSubscriptions();
         showToast("Abonament usunięty", "success");
     } catch (e) {

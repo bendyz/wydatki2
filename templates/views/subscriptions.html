@@ -1,3 +1,66 @@
+<!-- Subscription Edit Modal -->
+<div id="sub-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeSubModal()"></div>
+  <div class="fixed inset-0 z-10 overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
+          <h3 class="text-base font-semibold text-gray-900">Edytuj abonament</h3>
+          <button onclick="closeSubModal()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4 space-y-3">
+          <input type="hidden" id="sub-modal-id" />
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Nazwa</label>
+            <input id="sub-modal-name" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Kwota (zł)</label>
+              <input id="sub-modal-amount" type="number" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Co ile dni</label>
+              <input id="sub-modal-frequency" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Następna płatność</label>
+              <input id="sub-modal-next" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Data końca (opcjonalna)</label>
+              <input id="sub-modal-end" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Pozostałe raty (puste = bez limitu)</label>
+              <input id="sub-modal-installments" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Kategoria</label>
+              <select id="sub-modal-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">Brak</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 py-3 border-t flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <button onclick="deleteSubscription(document.getElementById('sub-modal-id').value)" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-red-50 text-danger text-sm font-medium hover:bg-red-100">
+            <i class="fas fa-trash"></i> Usuń
+          </button>
+          <button onclick="closeSubModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">Anuluj</button>
+          <button onclick="saveSubModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success text-white text-sm font-semibold hover:bg-green-600">
+            <i class="fas fa-check"></i> Zapisz
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Subscriptions View -->
 <div id="view-subscriptions" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
   <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -35,13 +98,14 @@
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kwota</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Co ile dni</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Następna płatność</th>
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
           </tr>
         </thead>
         <tbody id="subscriptions-list" class="divide-y divide-gray-200">
           <tr>
-            <td colspan="4" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td>
+            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td>
           </tr>
         </tbody>
       </table>
