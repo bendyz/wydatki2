@@ -891,10 +891,13 @@ async function loadCategories() {
         categoriesCache = cats;
         const tbody = document.getElementById("categories-list");
         tbody.innerHTML = cats.map((c) => `
-            <tr>
-                <td class="px-4 py-3 text-sm text-gray-900">${escapeHtml(c.name)}</td>
-                <td class="px-4 py-3 text-right text-sm">
-                    ${c.user_id ? `<button onclick="deleteCategory(${c.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>` : '<span class="text-gray-400 text-xs">globalna</span>'}
+            <tr id="cat-row-${c.id}">
+                <td class="px-4 py-3 text-sm text-gray-900" id="cat-name-${c.id}">${escapeHtml(c.name)}</td>
+                <td class="px-4 py-3 text-right text-sm whitespace-nowrap">
+                    ${c.user_id ? `
+                        <button onclick="startRenameCategory(${c.id}, '${escapeHtml(c.name)}')" class="text-gray-400 hover:text-primary mr-3" title="Zmień nazwę"><i class="fas fa-pen text-xs"></i></button>
+                        <button onclick="deleteCategory(${c.id})" class="text-gray-400 hover:text-danger" title="Usuń"><i class="fas fa-trash text-xs"></i></button>
+                    ` : '<span class="text-gray-400 text-xs">globalna</span>'}
                 </td>
             </tr>
         `).join("");
@@ -942,6 +945,33 @@ async function deleteCategory(id) {
         await apiRequest("DELETE", `/categories/${id}`);
         loadCategories();
         showToast("Kategoria usunięta", "success");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+function startRenameCategory(id, currentName) {
+    const nameTd = document.getElementById(`cat-name-${id}`);
+    nameTd.innerHTML = `
+        <form onsubmit="submitRenameCategory(event, ${id})" class="flex items-center gap-2">
+            <input type="text" value="${escapeHtml(currentName)}" id="cat-rename-${id}"
+                class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-48"
+                onkeydown="if(event.key==='Escape') loadCategories()" />
+            <button type="submit" class="text-success hover:text-green-700 text-xs"><i class="fas fa-check"></i></button>
+            <button type="button" onclick="loadCategories()" class="text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+        </form>`;
+    document.getElementById(`cat-rename-${id}`).focus();
+}
+
+async function submitRenameCategory(event, id) {
+    event.preventDefault();
+    const input = document.getElementById(`cat-rename-${id}`);
+    const newName = input.value.trim();
+    if (!newName) return;
+    try {
+        await apiRequest("PUT", `/categories/${id}`, { name: newName });
+        loadCategories();
+        showToast("Nazwa kategorii zmieniona", "success");
     } catch (e) {
         showToast(e.message, "error");
     }
