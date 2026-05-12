@@ -11,6 +11,7 @@ let currentUser = null;
 let _monthCategoryCache = {};
 let _categoryExpenseCache = {};
 let _tempResetToken = null;
+let _modalDirty = false;
 
 // ==================== AUTH ====================
 function getToken() {
@@ -508,6 +509,7 @@ async function openExpenseModal(expenseId) {
     }
 
     document.getElementById("expense-modal").classList.remove("hidden");
+    _modalDirty = false;
 }
 
 async function viewReceipt(expenseId) {
@@ -554,7 +556,9 @@ function closeReceiptFullscreen() {
     if (blobUrl) { URL.revokeObjectURL(blobUrl); delete el.dataset.blobUrl; }
 }
 
-function closeExpenseModal() {
+function closeExpenseModal(force = false) {
+    if (!force && _modalDirty && !confirm("Masz niezapisane zmiany. Zamknąć bez zapisywania?")) return;
+    _modalDirty = false;
     document.getElementById("expense-modal").classList.add("hidden");
     currentEditingExpenseId = null;
     if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
@@ -616,7 +620,7 @@ async function saveExpenseModal() {
         await _saveTagsForExpense(currentEditingExpenseId, "modal-tags-container");
         await Promise.all([loadTagsCache(), loadPopularTagsCache()]);
         showToast("Wydatek zaktualizowany!", "success");
-        closeExpenseModal();
+        closeExpenseModal(true);
         loadExpenses();
     } catch (e) {
         showToast(e.message, "error");
@@ -628,7 +632,7 @@ async function deleteExpenseModal() {
     if (!confirm("Usunąć wydatek?")) return;
     try {
         await apiRequest("DELETE", `/expenses/${currentEditingExpenseId}`);
-        closeExpenseModal();
+        closeExpenseModal(true);
         loadExpenses();
         showToast("Wydatek usunięty", "success");
     } catch (e) {
@@ -915,7 +919,7 @@ async function loadCategoriesSelect(selectId = "manual-category", selectedId = n
         select.innerHTML = '<option value="">-- wybierz --</option>' +
             cats.map((c) => `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
     } catch (e) {
-        console.error("Błąd ładowania kategorii:", e);
+        showToast("Błąd ładowania kategorii: " + e.message, "error");
     }
 }
 
@@ -1377,6 +1381,25 @@ async function initApp() {
     loadTagsCache();
     loadPopularTagsCache();
     showView("dashboard");
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (!document.getElementById("receipt-fullscreen").classList.contains("hidden")) {
+            closeReceiptFullscreen(); return;
+        }
+        if (!document.getElementById("expense-modal").classList.contains("hidden")) {
+            closeExpenseModal(); return;
+        }
+        if (!document.getElementById("draft-modal").classList.contains("hidden")) {
+            discardDraft(); return;
+        }
+        if (!document.getElementById("sub-modal")?.classList.contains("hidden")) {
+            closeSubModal(); return;
+        }
+        if (!document.getElementById("change-password-modal")?.classList.contains("hidden")) {
+            closeChangePasswordModal(); return;
+        }
+    });
 }
 
 // ==================== TAG MANAGEMENT VIEW ====================

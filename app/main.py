@@ -48,10 +48,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
-# CORS middleware - pozwala na połączenia z frontendu
+# CORS — domeny konfigurowane w data/config/config.yaml (klucz allowed_origins)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # W produkcji ograniczyć do konkretnych domen!
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

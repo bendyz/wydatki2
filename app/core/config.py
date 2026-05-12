@@ -43,6 +43,10 @@ class Settings(BaseModel):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 godziny
 
+    # CORS — domyślnie ["*"] (działa lokalnie i po sklonowaniu repo).
+    # Na serwerze produkcyjnym ustaw w config.yaml: allowed_origins: ["https://twoja-domena.pl"]
+    allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
+
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
@@ -91,6 +95,7 @@ class Settings(BaseModel):
                 "max_tokens": self.openrouter.max_tokens,
                 "temperature": self.openrouter.temperature,
             },
+            "allowed_origins": self.allowed_origins,
             "personal_context": self.personal_context,
             "duplicates": {
                 "date_range_days": self.duplicates.date_range_days,
