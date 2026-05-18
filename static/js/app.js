@@ -982,6 +982,28 @@ async function submitRenameCategory(event, id) {
 }
 
 // ==================== SUBSCRIPTIONS ====================
+function subCycleLabel(s) {
+    if (s.billing_day_of_month) return `${s.billing_day_of_month}. każdego mies.`;
+    return `co ${s.frequency_days} dni`;
+}
+
+function calcNextFromDays(startDateStr, frequencyDays) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let d = new Date(startDateStr + "T00:00:00");
+    if (isNaN(d.getTime())) return "";
+    while (d < today) d.setDate(d.getDate() + frequencyDays);
+    return d.toISOString().split("T")[0];
+}
+
+function calcNextFromDayOfMonth(dayOfMonth) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let d = new Date(today.getFullYear(), today.getMonth(), dayOfMonth);
+    if (d < today) d = new Date(today.getFullYear(), today.getMonth() + 1, dayOfMonth);
+    return d.toISOString().split("T")[0];
+}
+
 async function loadSubscriptions() {
     try {
         const subs = await apiRequest("GET", "/subscriptions/");
@@ -993,7 +1015,7 @@ async function loadSubscriptions() {
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 text-sm text-gray-900 font-medium">${escapeHtml(s.name)}</td>
                     <td class="px-4 py-3 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
-                    <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">co ${s.frequency_days} dni</td>
+                    <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">${subCycleLabel(s)}</td>
                     <td class="px-4 py-3 text-sm text-gray-500">${s.next_billing_date}</td>
                     <td class="px-4 py-3 text-right text-sm">
                         <button onclick="openSubModal(${s.id})" class="text-primary hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
@@ -1012,18 +1034,51 @@ async function openSubModal(id) {
     try {
         const s = await apiRequest("GET", `/subscriptions/${id}`);
         document.getElementById("sub-modal-id").value = s.id;
+        document.getElementById("sub-modal-start-date").value = s.start_date;
         document.getElementById("sub-modal-name").value = s.name;
         document.getElementById("sub-modal-amount").value = s.amount;
-        document.getElementById("sub-modal-frequency").value = s.frequency_days;
         document.getElementById("sub-modal-next").value = s.next_billing_date;
         document.getElementById("sub-modal-end").value = s.end_date || "";
         document.getElementById("sub-modal-installments").value = s.remaining_installments || "";
         await loadCategoriesSelect("sub-modal-category");
         document.getElementById("sub-modal-category").value = s.category_id || "";
+
+        const isMonthly = !!s.billing_day_of_month;
+        document.getElementById("sub-modal-mode").value = isMonthly ? "monthly" : "days";
+        document.getElementById("sub-modal-days-row").classList.toggle("hidden", isMonthly);
+        document.getElementById("sub-modal-monthly-row").classList.toggle("hidden", !isMonthly);
+        document.getElementById("sub-modal-frequency").value = s.frequency_days || "";
+        document.getElementById("sub-modal-billing-day").value = s.billing_day_of_month || "";
+
         document.getElementById("sub-modal").classList.remove("hidden");
     } catch (e) {
         showToast(e.message, "error");
     }
+}
+
+function subModalModeChanged() {
+    const isMonthly = document.getElementById("sub-modal-mode").value === "monthly";
+    document.getElementById("sub-modal-days-row").classList.toggle("hidden", isMonthly);
+    document.getElementById("sub-modal-monthly-row").classList.toggle("hidden", !isMonthly);
+    if (isMonthly) {
+        const day = parseInt(document.getElementById("sub-modal-billing-day").value);
+        if (day >= 1 && day <= 31) document.getElementById("sub-modal-next").value = calcNextFromDayOfMonth(day);
+    } else {
+        const freq = parseInt(document.getElementById("sub-modal-frequency").value);
+        const start = document.getElementById("sub-modal-start-date").value;
+        if (freq > 0 && start) document.getElementById("sub-modal-next").value = calcNextFromDays(start, freq);
+    }
+}
+
+function subModalFrequencyChanged() {
+    const freq = parseInt(document.getElementById("sub-modal-frequency").value);
+    const start = document.getElementById("sub-modal-start-date").value;
+    if (freq > 0 && start) document.getElementById("sub-modal-next").value = calcNextFromDays(start, freq);
+}
+
+function subModalBillingDayChanged() {
+    const day = parseInt(document.getElementById("sub-modal-billing-day").value);
+    if (day >= 1 && day <= 31) document.getElementById("sub-modal-next").value = calcNextFromDayOfMonth(day);
 }
 
 function closeSubModal() {
@@ -1033,10 +1088,12 @@ function closeSubModal() {
 async function saveSubModal() {
     const id = document.getElementById("sub-modal-id").value;
     const installmentsVal = document.getElementById("sub-modal-installments").value;
+    const isMonthly = document.getElementById("sub-modal-mode").value === "monthly";
     const data = {
         name: document.getElementById("sub-modal-name").value,
         amount: parseFloat(document.getElementById("sub-modal-amount").value),
-        frequency_days: parseInt(document.getElementById("sub-modal-frequency").value),
+        frequency_days: isMonthly ? null : parseInt(document.getElementById("sub-modal-frequency").value),
+        billing_day_of_month: isMonthly ? parseInt(document.getElementById("sub-modal-billing-day").value) : null,
         next_billing_date: document.getElementById("sub-modal-next").value,
         end_date: document.getElementById("sub-modal-end").value || null,
         remaining_installments: installmentsVal ? parseInt(installmentsVal) : null,
@@ -1059,14 +1116,32 @@ function hideAddSubscriptionForm() {
     document.getElementById("add-subscription-form").classList.add("hidden");
 }
 
+function subAddModeChanged() {
+    const isMonthly = document.querySelector('input[name="sub-mode"]:checked').value === "monthly";
+    document.getElementById("sub-add-days-row").classList.toggle("hidden", isMonthly);
+    document.getElementById("sub-add-monthly-row").classList.toggle("hidden", !isMonthly);
+}
+
 async function addSubscription() {
+    const isMonthly = document.querySelector('input[name="sub-mode"]:checked').value === "monthly";
+    const startDate = document.getElementById("sub-start").value;
+    let frequencyDays = null;
+    let billingDayOfMonth = null;
+
+    if (isMonthly) {
+        billingDayOfMonth = parseInt(document.getElementById("sub-billing-day").value);
+    } else {
+        frequencyDays = parseInt(document.getElementById("sub-frequency").value);
+    }
+
     const data = {
         name: document.getElementById("sub-name").value,
         amount: parseFloat(document.getElementById("sub-amount").value),
-        frequency_days: parseInt(document.getElementById("sub-frequency").value),
-        start_date: document.getElementById("sub-start").value,
+        frequency_days: frequencyDays,
+        billing_day_of_month: billingDayOfMonth,
+        start_date: startDate,
         end_date: document.getElementById("sub-end").value || null,
-        next_billing_date: document.getElementById("sub-start").value,
+        next_billing_date: startDate,
         remaining_installments: document.getElementById("sub-installments").value ? parseInt(document.getElementById("sub-installments").value) : null,
         category_id: document.getElementById("sub-category").value || null,
     };

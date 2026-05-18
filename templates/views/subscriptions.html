@@ -10,6 +10,7 @@
         </div>
         <div class="p-4 space-y-3">
           <input type="hidden" id="sub-modal-id" />
+          <input type="hidden" id="sub-modal-start-date" />
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Nazwa</label>
             <input id="sub-modal-name" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -20,9 +21,20 @@
               <input id="sub-modal-amount" type="number" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">Co ile dni</label>
-              <input id="sub-modal-frequency" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <label class="block text-xs font-medium text-gray-500 mb-1">Typ cyklu</label>
+              <select id="sub-modal-mode" onchange="subModalModeChanged()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="days">Co X dni</option>
+                <option value="monthly">X-tego każdego miesiąca</option>
+              </select>
             </div>
+          </div>
+          <div id="sub-modal-days-row">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Co ile dni</label>
+            <input id="sub-modal-frequency" type="number" min="1" onchange="subModalFrequencyChanged()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div id="sub-modal-monthly-row" class="hidden">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Dzień miesiąca (1–31)</label>
+            <input id="sub-modal-billing-day" type="number" min="1" max="31" onchange="subModalBillingDayChanged()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -77,8 +89,23 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <input type="text" id="sub-name" class="border rounded-md px-3 py-2" placeholder="Nazwa (np. Netflix)" />
       <input type="number" step="0.01" id="sub-amount" class="border rounded-md px-3 py-2" placeholder="Kwota" />
-      <input type="number" id="sub-frequency" class="border rounded-md px-3 py-2" placeholder="Co ile dni (np. 30)" />
-      <input type="date" id="sub-start" class="border rounded-md px-3 py-2" placeholder="Data startu" />
+      <div class="md:col-span-2">
+        <div class="flex gap-2 mb-2">
+          <label class="flex items-center gap-1 text-sm cursor-pointer">
+            <input type="radio" name="sub-mode" value="days" checked onchange="subAddModeChanged()" /> Co X dni
+          </label>
+          <label class="flex items-center gap-1 text-sm cursor-pointer">
+            <input type="radio" name="sub-mode" value="monthly" onchange="subAddModeChanged()" /> X-tego każdego miesiąca
+          </label>
+        </div>
+        <div id="sub-add-days-row">
+          <input type="number" id="sub-frequency" class="border rounded-md px-3 py-2 w-full" placeholder="Co ile dni (np. 30)" />
+        </div>
+        <div id="sub-add-monthly-row" class="hidden">
+          <input type="number" id="sub-billing-day" min="1" max="31" class="border rounded-md px-3 py-2 w-full" placeholder="Dzień miesiąca (np. 2)" />
+        </div>
+      </div>
+      <input type="date" id="sub-start" class="border rounded-md px-3 py-2" placeholder="Data startu / pierwsza płatność" />
       <input type="date" id="sub-end" class="border rounded-md px-3 py-2" placeholder="Data końca (opcjonalna)" />
       <input type="number" id="sub-installments" class="border rounded-md px-3 py-2" placeholder="Liczba rat (opcjonalna)" />
       <select id="sub-category" class="border rounded-md px-3 py-2">
@@ -98,7 +125,7 @@
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kwota</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Co ile dni</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Cykl</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Następna płatność</th>
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
           </tr>

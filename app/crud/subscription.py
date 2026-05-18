@@ -1,9 +1,21 @@
+from calendar import monthrange
 from datetime import date, timedelta
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.models import Expense, Subscription
+
+
+def _next_monthly_date(current_date: date, day_of_month: int) -> date:
+    """Zwraca datę tego samego dnia w następnym miesiącu."""
+    month = current_date.month + 1
+    year = current_date.year
+    if month > 12:
+        month = 1
+        year += 1
+    max_day = monthrange(year, month)[1]
+    return date(year, month, min(day_of_month, max_day))
 
 
 def get_subscription(
@@ -63,8 +75,9 @@ def create_subscription(
     user_id: int,
     name: str,
     amount: float,
-    frequency_days: int,
     start_date: date,
+    frequency_days: Optional[int] = None,
+    billing_day_of_month: Optional[int] = None,
     end_date: Optional[date] = None,
     next_billing_date: Optional[date] = None,
     remaining_installments: Optional[int] = None,
@@ -82,6 +95,7 @@ def create_subscription(
         name=name,
         amount=amount,
         frequency_days=frequency_days,
+        billing_day_of_month=billing_day_of_month,
         start_date=start_date,
         end_date=end_date,
         next_billing_date=next_billing_date,
@@ -112,6 +126,7 @@ def update_subscription(
         "name",
         "amount",
         "frequency_days",
+        "billing_day_of_month",
         "start_date",
         "end_date",
         "next_billing_date",
@@ -119,9 +134,16 @@ def update_subscription(
         "category_id",
     }
 
+    # Pola, które mogą być jawnie wyzerowane (None = usuń wartość)
+    nullable_fields = {"end_date", "category_id", "remaining_installments",
+                       "frequency_days", "billing_day_of_month"}
+
     for key, value in kwargs.items():
-        if key in allowed_fields and value is not None:
-            setattr(db_subscription, key, value)
+        if key not in allowed_fields:
+            continue
+        if value is None and key not in nullable_fields:
+            continue
+        setattr(db_subscription, key, value)
 
     db.commit()
     db.refresh(db_subscription)
@@ -175,9 +197,14 @@ def process_subscription_billing(
     db.refresh(db_expense)
 
     # Aktualizuj datę kolejnej płatności
-    subscription.next_billing_date = subscription.next_billing_date + timedelta(
-        days=subscription.frequency_days
-    )
+    if subscription.billing_day_of_month:
+        subscription.next_billing_date = _next_monthly_date(
+            subscription.next_billing_date, subscription.billing_day_of_month
+        )
+    else:
+        subscription.next_billing_date = subscription.next_billing_date + timedelta(
+            days=subscription.frequency_days
+        )
 
     # Zmniejsz licznik pozostałych płatności
     if subscription.remaining_installments is not None:

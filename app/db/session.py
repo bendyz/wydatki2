@@ -54,3 +54,8 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE subscriptions ADD COLUMN billing_day_of_month INTEGER"))
+            conn.commit()
+        except Exception:
+            pass

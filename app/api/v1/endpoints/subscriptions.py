@@ -44,6 +44,7 @@ def create_new_subscription(
         name=subscription.name,
         amount=subscription.amount,
         frequency_days=subscription.frequency_days,
+        billing_day_of_month=subscription.billing_day_of_month,
         start_date=subscription.start_date,
         end_date=subscription.end_date,
         next_billing_date=subscription.next_billing_date,
