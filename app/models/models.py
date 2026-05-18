@@ -116,7 +116,7 @@ class Subscription(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    frequency_days = Column(Integer, nullable=True)  # None when billing_day_of_month is used
+    frequency_days = Column(Integer, nullable=False)  # 30 for monthly mode (scheduling uses billing_day_of_month)
     billing_day_of_month = Column(Integer, nullable=True)  # 1-31; monthly mode
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)  # None if indefinite

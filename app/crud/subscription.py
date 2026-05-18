@@ -89,6 +89,8 @@ def create_subscription(
     """
     if next_billing_date is None:
         next_billing_date = start_date
+    if frequency_days is None:
+        frequency_days = 30  # placeholder; scheduling uses billing_day_of_month
 
     db_subscription = Subscription(
         user_id=user_id,
@@ -136,10 +138,13 @@ def update_subscription(
 
     # Pola, które mogą być jawnie wyzerowane (None = usuń wartość)
     nullable_fields = {"end_date", "category_id", "remaining_installments",
-                       "frequency_days", "billing_day_of_month"}
+                       "billing_day_of_month"}
 
     for key, value in kwargs.items():
         if key not in allowed_fields:
+            continue
+        # frequency_days NOT NULL w DB — nigdy nie zerujemy
+        if key == "frequency_days" and value is None:
             continue
         if value is None and key not in nullable_fields:
             continue
