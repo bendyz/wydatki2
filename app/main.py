@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -47,6 +48,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["js_version"] = str(int(os.path.getmtime("static/js/app.js")))
 
 # CORS — domeny konfigurowane w data/config/config.yaml (klucz allowed_origins)
 app.add_middleware(

@@ -167,7 +167,7 @@
       <p id="tag-dropdown-empty" class="hidden text-xs text-gray-400 italic">Brak tagów</p>
     </div>
 
-    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}?v={{ js_version }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

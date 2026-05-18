@@ -37,19 +37,14 @@ class SubscriptionBase(BaseModel):
         None, description="ID kategorii przypisanej do abonamentu"
     )
 
+class SubscriptionCreate(SubscriptionBase):
+    """Schemat do tworzenia nowego abonamentu"""
+
     @model_validator(mode="after")
     def check_frequency_or_day(self):
         if self.frequency_days is None and self.billing_day_of_month is None:
             raise ValueError("Podaj frequency_days lub billing_day_of_month")
-        if self.frequency_days is not None and self.billing_day_of_month is not None:
-            raise ValueError("Podaj tylko jedno: frequency_days lub billing_day_of_month")
         return self
-
-
-class SubscriptionCreate(SubscriptionBase):
-    """Schemat do tworzenia nowego abonamentu"""
-
-    pass
 
 
 class SubscriptionUpdate(BaseModel):
