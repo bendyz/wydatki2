@@ -1170,6 +1170,7 @@ async function deleteSubscription(id) {
 // ==================== STATS & CHARTS ====================
 let categoryChart = null;
 let dailyChart = null;
+let tagMonthlyChart = null;
 
 async function loadStats() {
     const now = new Date();
@@ -1610,6 +1611,9 @@ async function openTagDetail(tagName) {
         </div>
     `).join("") || '<p class="text-sm text-gray-400 italic">Brak danych</p>';
 
+    // Monthly chart
+    renderTagMonthlyChart(expenses);
+
     // Expense list
     document.getElementById("tag-detail-expenses").innerHTML = expenses.map(e => `
         <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
@@ -1625,6 +1629,45 @@ async function openTagDetail(tagName) {
             </div>
         </div>
     `).join("") || '<div class="p-4 text-center text-sm text-gray-400">Brak wydatków</div>';
+}
+
+function renderTagMonthlyChart(expenses) {
+    const PL_MONTHS = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+    const now = new Date();
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: `${PL_MONTHS[d.getMonth()]} ${d.getFullYear()}`, total: 0 });
+    }
+    const monthMap = Object.fromEntries(months.map(m => [m.key, m]));
+    expenses.forEach(e => {
+        const key = e.date.substring(0, 7);
+        if (monthMap[key]) monthMap[key].total += e.amount;
+    });
+
+    if (tagMonthlyChart) tagMonthlyChart.destroy();
+    tagMonthlyChart = new Chart(
+        document.getElementById("tag-monthly-chart").getContext("2d"),
+        {
+            type: "bar",
+            data: {
+                labels: months.map(m => m.label),
+                datasets: [{
+                    data: months.map(m => m.total),
+                    backgroundColor: "rgba(59, 130, 246, 0.7)",
+                    borderColor: "#3b82f6",
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { callback: v => v.toFixed(0) + ' zł' } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + ' zł' } } },
+            },
+        }
+    );
 }
 
 function closeTagDetail() {
