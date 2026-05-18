@@ -54,18 +54,18 @@ def get_categories(
     return query.offset(skip).limit(limit).all()
 
 
-def create_category(db: Session, name: str, user_id: int) -> Category:
+def create_category(db: Session, name: str, user_id: int) -> Optional[Category]:
     """
     Tworzy nową kategorię dla użytkownika.
-
-    Args:
-        db: Sesja bazy danych SQLAlchemy
-        name: Nazwa kategorii
-        user_id: ID właściciela
-
-    Returns:
-        Utworzony obiekt Category
+    Zwraca None jeśli kategoria o tej nazwie już istnieje dla tego użytkownika.
     """
+    existing = (
+        db.query(Category)
+        .filter(Category.name == name, Category.user_id == user_id)
+        .first()
+    )
+    if existing:
+        return None
     db_category = Category(name=name, user_id=user_id)
     db.add(db_category)
     db.commit()

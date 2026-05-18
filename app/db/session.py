@@ -59,3 +59,24 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        # Migrate categories: UNIQUE(name) → UNIQUE(name, user_id)
+        row = conn.execute(text(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='categories'"
+        )).fetchone()
+        if row and "name, user_id" not in row[0]:
+            conn.execute(text("PRAGMA foreign_keys=off"))
+            conn.execute(text("""
+                CREATE TABLE categories_new (
+                    id INTEGER NOT NULL,
+                    name VARCHAR NOT NULL,
+                    user_id INTEGER,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id),
+                    UNIQUE (name, user_id)
+                )
+            """))
+            conn.execute(text("INSERT INTO categories_new SELECT id, name, user_id FROM categories"))
+            conn.execute(text("DROP TABLE categories"))
+            conn.execute(text("ALTER TABLE categories_new RENAME TO categories"))
+            conn.execute(text("PRAGMA foreign_keys=on"))
+            conn.commit()

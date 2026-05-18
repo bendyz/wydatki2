@@ -37,6 +37,11 @@ def create_new_category(
     Tworzy nową kategorię wydatków dla aktualnie zalogowanego użytkownika.
     """
     db_category = create_category(db=db, name=category.name, user_id=current_user.id)
+    if db_category is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Kategoria o tej nazwie już istnieje",
+        )
     return db_category
 
 
