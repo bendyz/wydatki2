@@ -59,6 +59,11 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN card_id INTEGER REFERENCES payment_cards(id)"))
+            conn.commit()
+        except Exception:
+            pass
         # Migrate categories: UNIQUE(name) → UNIQUE(name, user_id)
         row = conn.execute(text(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='categories'"
