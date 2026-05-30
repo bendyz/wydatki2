@@ -4,6 +4,7 @@ const EXPENSES_PER_PAGE = 50;
 let currentDraft = null;
 let currentReceiptFile = null;
 let categoriesCache = [];
+let cardsCache = [];
 let currentEditingExpenseId = null;
 let currentExpenses = [];
 let currentExpensesOffset = 0;
@@ -146,6 +147,7 @@ function showView(viewName) {
     if (viewName === "cards") loadCardsView();
     if (viewName === "add-expense") {
         loadCategoriesSelect();
+        loadCardsSelect("manual-card");
         document.getElementById("manual-date").valueAsDate = new Date();
     }
 }
@@ -656,11 +658,13 @@ function showExpenseTab(tab) {
 }
 
 async function addManualExpense() {
+    const cardEl = document.getElementById("manual-card");
     const data = {
         amount: parseFloat(document.getElementById("manual-amount").value),
         date: document.getElementById("manual-date").value,
         description: document.getElementById("manual-description").value,
         category_id: document.getElementById("manual-category").value || null,
+        card_id: cardEl ? (cardEl.value || null) : null,
         items: [],
     };
     try {
@@ -766,6 +770,7 @@ function showDraft(draft) {
     }
 
     loadCategoriesSelect("draft-category", draft.category_id);
+    loadCardsSelect("draft-card", draft.card_id);
 
     const itemsDiv = document.getElementById("draft-items-list");
     if (draft.items && draft.items.length) {
@@ -843,11 +848,13 @@ async function saveDraftExpense() {
         });
     });
 
+    const draftCardEl = document.getElementById("draft-card");
     const data = {
         amount: parseFloat(document.getElementById("draft-amount").value),
         date: document.getElementById("draft-date").value,
         description: document.getElementById("draft-description").value,
         category_id: document.getElementById("draft-category").value || null,
+        card_id: draftCardEl ? (draftCardEl.value || null) : null,
         items,
     };
 
@@ -922,6 +929,16 @@ async function loadCategoriesSelect(selectId = "manual-category", selectedId = n
     } catch (e) {
         showToast("Błąd ładowania kategorii: " + e.message, "error");
     }
+}
+
+async function loadCardsSelect(selectId, selectedId = null) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    try {
+        cardsCache = await apiRequest("GET", "/cards/");
+        select.innerHTML = '<option value="">-- brak --</option>' +
+            cardsCache.map((c) => `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+    } catch (_) {}
 }
 
 function showAddCategoryForm() {
