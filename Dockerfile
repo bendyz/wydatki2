@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY static/ static/
 COPY templates/ templates/
+COPY VERSION .
 
 # data/ is mounted as a volume at runtime — create empty dirs so the
 # app doesn't crash on first start before the volume is attached
