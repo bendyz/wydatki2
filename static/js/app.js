@@ -474,6 +474,7 @@ async function openExpenseModal(expenseId) {
     document.getElementById("modal-date").value = expense.date;
     document.getElementById("modal-description").value = expense.description || "";
     loadCategoriesSelect("modal-category", expense.category_id);
+    loadCardsSelect("modal-card", expense.card_id);
 
     const itemsList = document.getElementById("modal-items-list");
     if (expense.items && expense.items.length) {
@@ -610,11 +611,13 @@ async function saveExpenseModal() {
         });
     });
 
+    const modalCardEl = document.getElementById("modal-card");
     const data = {
         amount: parseFloat(document.getElementById("modal-amount").value),
         date: document.getElementById("modal-date").value,
         description: document.getElementById("modal-description").value,
         category_id: document.getElementById("modal-category").value || null,
+        card_id: modalCardEl ? (modalCardEl.value || null) : null,
         items: items,
     };
 

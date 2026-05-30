@@ -143,6 +143,14 @@
               <option value="">-- wybierz --</option>
             </select>
           </div>
+          {% if enable_payment_cards %}
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Karta płatnicza</label>
+            <select id="modal-card" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="">-- brak --</option>
+            </select>
+          </div>
+          {% endif %}
           <div>
             <div class="flex items-center justify-between mb-1">
               <label class="block text-xs font-medium text-gray-500">Pozycje</label>
