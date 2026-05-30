@@ -266,7 +266,10 @@ function renderExpenses(expenses) {
                 ${e.description || "-"}
                 ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("")}</div>` : ""}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500">${e.category_name || "-"}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">
+                ${e.category_name || "-"}
+                ${e.card_name ? `<div class="mt-0.5"><span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full"><i class="fas fa-credit-card text-[10px]"></i>${escapeHtml(e.card_name)}</span></div>` : ""}
+            </td>
             <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
             <td class="px-4 py-3 text-center text-sm whitespace-nowrap">
                 ${e.receipt_image_path ? `<button onclick="event.stopPropagation(); viewReceipt(${e.id})" class="text-gray-400 hover:text-gray-700 mr-2" title="Podgląd paragonu"><i class="fas fa-image"></i></button>` : ""}
@@ -291,7 +294,10 @@ function renderExpenses(expenses) {
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-gray-900 truncate">${e.description || "Bez opisu"}</p>
                     <p class="text-xs text-gray-500">${e.date} · ${e.category_name || "-"}</p>
-                    ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("")}</div>` : ""}
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        ${e.card_name ? `<span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full"><i class="fas fa-credit-card text-[10px]"></i>${escapeHtml(e.card_name)}</span>` : ""}
+                        ${e.tags && e.tags.length ? e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("") : ""}
+                    </div>
                 </div>
                 <div class="text-right ml-3">
                     <p class="text-sm font-bold text-gray-900">${e.amount.toFixed(2)} zł</p>
