@@ -47,6 +47,8 @@ class Settings(BaseModel):
     # Na serwerze produkcyjnym ustaw w config.yaml: allowed_origins: ["https://twoja-domena.pl"]
     allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
 
+    enable_payment_cards: bool = False
+
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
@@ -83,6 +85,7 @@ class Settings(BaseModel):
             "app_name": self.app_name,
             "debug": self.debug,
             "registration_enabled": self.registration_enabled,
+            "enable_payment_cards": self.enable_payment_cards,
             "SECRET_KEY": self.SECRET_KEY,
             "ALGORITHM": self.ALGORITHM,
             "ACCESS_TOKEN_EXPIRE_MINUTES": self.ACCESS_TOKEN_EXPIRE_MINUTES,

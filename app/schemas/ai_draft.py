@@ -89,6 +89,9 @@ class ExpenseDraft(BaseModel):
         description="True jeśli AI ma niską pewność – zalecana weryfikacja użytkownika",
     )
 
+    # Karta płatnicza rozpoznana przez AI
+    card_id: Optional[int] = Field(None, description="ID karty płatniczej rozpoznanej przez AI")
+
     # Tagi zaproponowane przez AI (tylko jeśli pewność ≥ 0.7)
     suggested_tags: List[str] = Field(
         default_factory=list,

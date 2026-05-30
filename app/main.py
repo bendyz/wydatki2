@@ -70,7 +70,7 @@ async def favicon():
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """
-    Serwuje główną stronę aplikacji (SPA).
-    """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "enable_payment_cards": settings.enable_payment_cards,
+    })

@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     admin,
     ai,
     auth,
+    cards,
     categories,
     expenses,
     receipts,
@@ -25,3 +26,4 @@ api_router.include_router(
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
+api_router.include_router(cards.router, prefix="/cards", tags=["cards"])

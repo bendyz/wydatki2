@@ -88,6 +88,7 @@ def create_expense(
     items: List[dict],
     metadata_ai: Optional[str] = None,
     receipt_image_path: Optional[str] = None,
+    card_id: Optional[int] = None,
 ) -> Expense:
     """
     Tworzy nowy wydatek wraz z pozycjami (items).
@@ -114,6 +115,7 @@ def create_expense(
         category_id=category_id,
         metadata_ai=metadata_ai,
         receipt_image_path=receipt_image_path,
+        card_id=card_id,
     )
     db.add(db_expense)
     db.commit()
@@ -145,6 +147,7 @@ def update_expense(
     category_id: Optional[int] = None,
     items: Optional[List[dict]] = None,
     receipt_image_path: Optional[str] = None,
+    card_id: Optional[int] = None,
 ) -> Optional[Expense]:
     """
     Aktualizuje wydatek użytkownika.
@@ -178,6 +181,8 @@ def update_expense(
         db_expense.category_id = category_id
     if receipt_image_path is not None:
         db_expense.receipt_image_path = receipt_image_path
+    if card_id is not None:
+        db_expense.card_id = card_id
 
     # Jeśli przekazano nowe pozycje, usuń stare i dodaj nowe
     if items is not None:

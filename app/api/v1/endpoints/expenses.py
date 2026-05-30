@@ -41,6 +41,7 @@ def create_new_expense(
         description=expense.description,
         expense_date=expense.date,
         category_id=expense.category_id,
+        card_id=expense.card_id,
         items=[item.model_dump() for item in expense.items],
     )
     return db_expense
@@ -128,6 +129,7 @@ def update_existing_expense(
         description=update_data.get("description"),
         expense_date=update_data.get("date"),
         category_id=update_data.get("category_id"),
+        card_id=update_data.get("card_id"),
         items=items_list,
     )
     if not updated:

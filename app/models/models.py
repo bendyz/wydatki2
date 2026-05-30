@@ -16,6 +16,22 @@ from sqlalchemy.orm import relationship
 
 from app.db.session import Base
 
+
+class PaymentCard(Base):
+    __tablename__ = "payment_cards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    last_six_digits = Column(String(6), nullable=True)
+    # Warunki bezpłatnej karty w danym miesiącu
+    min_transactions = Column(Integer, nullable=True)   # min N transakcji/miesiąc
+    min_amount = Column(Float, nullable=True)           # min M zł/miesiąc
+    rules_require_all = Column(Boolean, default=True)   # True=AND, False=OR
+
+    user = relationship("User", back_populates="payment_cards")
+    expenses = relationship("Expense", back_populates="card")
+
 # Many-to-many: expenses ↔ tags
 expense_tags = Table(
     "expense_tags",
@@ -53,6 +69,7 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
     categories = relationship("Category", back_populates="user")
     tags = relationship("Tag", back_populates="user")
+    payment_cards = relationship("PaymentCard", back_populates="user")
 
 
 class Category(Base):
@@ -85,16 +102,22 @@ class Expense(Base):
     metadata_ai = Column(String, nullable=True)
     # Path to the processed receipt image on filesystem
     receipt_image_path = Column(String, nullable=True)
+    card_id = Column(Integer, ForeignKey("payment_cards.id"), nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="expenses")
     category = relationship("Category", back_populates="expenses")
     items = relationship("ExpenseItem", back_populates="expense")
     tags = relationship("Tag", secondary=expense_tags, back_populates="expenses")
+    card = relationship("PaymentCard", back_populates="expenses")
 
     @property
     def category_name(self):
         return self.category.name if self.category else None
+
+    @property
+    def card_name(self):
+        return self.card.name if self.card else None
 
 
 class ExpenseItem(Base):

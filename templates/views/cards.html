@@ -1,0 +1,104 @@
+<!-- Card Edit/Add Modal -->
+<div id="card-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeCardModal()"></div>
+  <div class="fixed inset-0 z-10 overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
+          <h3 id="card-modal-title" class="text-base font-semibold text-gray-900">Dodaj kartę płatniczą</h3>
+          <button onclick="closeCardModal()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4 space-y-3">
+          <input type="hidden" id="card-modal-id" />
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Nazwa karty <span class="text-red-400">*</span></label>
+            <input id="card-modal-name" type="text" placeholder="np. Visa ZEN, mBank Mastercard"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Ostatnie 6 cyfr numeru karty <span class="text-gray-400 font-normal">(opcjonalnie — do rozpoznawania przez AI)</span></label>
+            <input id="card-modal-digits" type="text" maxlength="6" placeholder="np. 123456"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              oninput="this.value=this.value.replace(/\D/g,'')" />
+          </div>
+          <div class="border-t pt-3">
+            <p class="text-xs font-semibold text-gray-600 mb-2">Warunki bezpłatnej karty <span class="text-gray-400 font-normal">(opcjonalnie)</span></p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Min. liczba transakcji/miesiąc</label>
+                <input id="card-modal-min-tx" type="number" min="1" placeholder="np. 5"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Min. kwota zł/miesiąc</label>
+                <input id="card-modal-min-amt" type="number" min="0.01" step="0.01" placeholder="np. 500"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+            </div>
+            <div id="card-modal-rules-row" class="mt-2 hidden">
+              <label class="block text-xs font-medium text-gray-500 mb-1">Logika warunków</label>
+              <select id="card-modal-rules-logic" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="true">Oba warunki muszą być spełnione (AND)</option>
+                <option value="false">Wystarczy jeden warunek (OR)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 pb-4 flex gap-2 justify-end border-t pt-3">
+          <button onclick="closeCardModal()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">Anuluj</button>
+          <button onclick="saveCard()" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-blue-700">
+            <i class="fas fa-save mr-1"></i> Zapisz
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Card Expenses Modal -->
+<div id="card-expenses-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeCardExpensesModal()"></div>
+  <div class="fixed inset-0 z-10 overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div class="relative w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
+          <h3 id="card-expenses-title" class="text-base font-semibold text-gray-900">Wydatki karty</h3>
+          <button onclick="closeCardExpensesModal()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="card-expenses-list" class="p-4 max-h-[70vh] overflow-y-auto space-y-2">
+          <p class="text-gray-400 text-sm text-center py-4">Ładowanie...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cards View -->
+<div id="view-cards" class="view">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900"><i class="fas fa-credit-card text-primary mr-2"></i>Karty płatnicze</h1>
+        <p class="text-sm text-gray-500 mt-1">Śledź transakcje i warunki bezpłatnej karty per miesiąc</p>
+      </div>
+      <button onclick="openAddCardModal()" class="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+        <i class="fas fa-plus"></i> Dodaj kartę
+      </button>
+    </div>
+
+    <!-- No cards state -->
+    <div id="cards-empty" class="hidden text-center py-16">
+      <i class="fas fa-credit-card text-gray-300 text-5xl mb-4"></i>
+      <p class="text-gray-500 text-lg">Nie masz jeszcze żadnych kart płatniczych.</p>
+      <button onclick="openAddCardModal()" class="mt-4 bg-primary text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+        <i class="fas fa-plus mr-1"></i> Dodaj pierwszą kartę
+      </button>
+    </div>
+
+    <!-- Stats table -->
+    <div id="cards-stats-container" class="space-y-6"></div>
+
+  </div>
+</div>

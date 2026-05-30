@@ -11,5 +11,8 @@
   {% include "views/stats.html" %}
   {% include "views/admin.html" %}
   {% include "views/tags.html" %}
+  {% if enable_payment_cards %}
+  {% include "views/cards.html" %}
+  {% endif %}
   {% include "partials/draft_modal.html" %}
 {% endblock %}

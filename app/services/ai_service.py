@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.crud.card import get_cards
 from app.crud.category import get_categories
 from app.crud.expense import get_expenses
 from app.crud.tag import get_tags
@@ -19,8 +20,9 @@ def _build_system_prompt(
     user_categories: List[dict],
     today: Optional[date] = None,
     user_tags: Optional[List[str]] = None,
+    user_cards: Optional[List[dict]] = None,
 ) -> str:
-    """Buduje prompt systemowy z kategoriami, tagami i kontekstem personalnym."""
+    """Buduje prompt systemowy z kategoriami, tagami, kartami i kontekstem personalnym."""
     if today is None:
         today = date.today()
     today_str = today.strftime("%Y-%m-%d")
@@ -46,6 +48,19 @@ def _build_system_prompt(
     else:
         tags_rule = "8. TAGI: Użytkownik nie ma jeszcze żadnych tagów. Pole suggested_tags zwróć jako []."
 
+    if user_cards:
+        cards_lines = "\n".join([
+            f"- ID {c['id']}: {c['name']}" + (f" (ostatnie 6 cyfr: {c['last_six_digits']})" if c.get('last_six_digits') else "")
+            for c in user_cards
+        ])
+        cards_rule = f"""9. KARTY PŁATNICZE: Użytkownik ma następujące karty:
+{cards_lines}
+   Jeśli na paragonie widoczny jest numer karty (ostatnie 6 cyfr) lub opis wskazuje na konkretną kartę (np. "kartą Visa ZEN"), przypisz jej ID w polu "card_id". Jeśli nie możesz dopasować — użyj null."""
+        card_id_field = '"card_id": null,'
+    else:
+        cards_rule = "9. KARTY PŁATNICZE: Użytkownik nie ma zdefiniowanych kart. Pole card_id zwróć jako null."
+        card_id_field = '"card_id": null,'
+
     return f"""Jesteś inteligentnym asystentem finansowym do analizy wydatków.
 Twoim zadaniem jest przetworzenie dostarczonego paragonu lub opisu wydatku i zwrócenie wyniku WYŁĄCZNIE jako obiekt JSON. Nie dodawaj żadnego tekstu przed ani po JSON.
 
@@ -66,6 +81,7 @@ ZASADY:
 6. Zwróć TYLKO obiekt JSON. Nie używaj markdown (```json), nie komentuj.
 7. NIE wymyślaj nowych tagów — korzystaj wyłącznie z listy tagów użytkownika.
 {tags_rule}
+{cards_rule}
 
 FORMAT ODPOWIEDZI:
 {{
@@ -74,6 +90,7 @@ FORMAT ODPOWIEDZI:
   "date": "2025-01-15",
   "category_id": 1,
   "category_name": "Nazwa kategorii",
+  {card_id_field}
   "suggested_tags": [],
   "items": [
     {{
@@ -223,6 +240,7 @@ def _build_draft_from_parsed(
     ai_model: Optional[str] = None,
     processing_time_ms: Optional[int] = None,
     user_tag_names: Optional[List[str]] = None,
+    valid_card_ids: Optional[set] = None,
 ) -> ExpenseDraft:
     """Buduje obiekt ExpenseDraft z sparsowanej odpowiedzi AI."""
     items = []
@@ -263,12 +281,17 @@ def _build_draft_from_parsed(
     allowed_tags = set(user_tag_names or [])
     suggested_tags = [t for t in raw_suggested if t in allowed_tags]
 
+    # Filtruj card_id — tylko jeśli karta należy do użytkownika
+    raw_card_id = parsed.get("card_id")
+    card_id = raw_card_id if (valid_card_ids and raw_card_id in valid_card_ids) else None
+
     return ExpenseDraft(
         amount=amount,
         description=parsed.get("description"),
         date=expense_date,
         category_id=parsed.get("category_id"),
         category_name=parsed.get("category_name"),
+        card_id=card_id,
         items=items,
         receipt_image_path=receipt_image_path,
         duplicate_warnings=duplicate_warnings,
@@ -297,11 +320,14 @@ async def parse_receipt_image(
         for c in get_categories(db, user_id=user_id, include_global=True)
     ]
     user_tag_names = [t.name for t in get_tags(db, user_id)]
+    user_cards_raw = get_cards(db, user_id)
+    user_cards = [{"id": c.id, "name": c.name, "last_six_digits": c.last_six_digits} for c in user_cards_raw]
+    valid_card_ids = {c.id for c in user_cards_raw}
 
     base64_image = _encode_image_to_base64(image_path)
     mime_type = _get_mime_type_from_path(image_path)
 
-    system_prompt = _build_system_prompt(user_categories, today=date.today(), user_tags=user_tag_names)
+    system_prompt = _build_system_prompt(user_categories, today=date.today(), user_tags=user_tag_names, user_cards=user_cards)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -338,6 +364,7 @@ async def parse_receipt_image(
         ai_model=settings.openrouter.model,
         processing_time_ms=processing_time_ms,
         user_tag_names=user_tag_names,
+        valid_card_ids=valid_card_ids,
     )
 
 
@@ -363,8 +390,11 @@ async def parse_text_expense(
         for c in get_categories(db, user_id=user_id, include_global=True)
     ]
     user_tag_names = [t.name for t in get_tags(db, user_id)]
+    user_cards_raw = get_cards(db, user_id)
+    user_cards = [{"id": c.id, "name": c.name, "last_six_digits": c.last_six_digits} for c in user_cards_raw]
+    valid_card_ids = {c.id for c in user_cards_raw}
 
-    system_prompt = _build_system_prompt(user_categories, today=current_date, user_tags=user_tag_names)
+    system_prompt = _build_system_prompt(user_categories, today=current_date, user_tags=user_tag_names, user_cards=user_cards)
 
     user_prompt = f"""Przeanalizuj poniższy opis wydatku i zwróć wynik jako JSON.
 Dzisiaj jest {current_date.strftime("%Y-%m-%d")} ({current_date.strftime("%A")}).
@@ -393,4 +423,5 @@ Pamiętaj: zwróć TYLKO obiekt JSON."""
         ai_model=settings.openrouter.model,
         processing_time_ms=processing_time_ms,
         user_tag_names=user_tag_names,
+        valid_card_ids=valid_card_ids,
     )

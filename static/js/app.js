@@ -143,6 +143,7 @@ function showView(viewName) {
     if (viewName === "stats") loadStats();
     if (viewName === "admin") { loadAdminConfig(); loadAdminUsers(); }
     if (viewName === "tags") loadTagsView();
+    if (viewName === "cards") loadCardsView();
     if (viewName === "add-expense") {
         loadCategoriesSelect();
         document.getElementById("manual-date").valueAsDate = new Date();
@@ -1834,3 +1835,269 @@ document.addEventListener("DOMContentLoaded", async () => {
         showView("login");
     }
 });
+
+// ==================== PAYMENT CARDS ====================
+let _cardsStatsCache = [];
+
+async function loadCardsView() {
+    try {
+        const stats = await apiRequest("GET", "/cards/stats?months=4");
+        _cardsStatsCache = stats;
+        renderCardsStats(stats);
+    } catch (e) {
+        showToast("Błąd ładowania kart: " + e.message, "error");
+    }
+}
+
+function renderCardsStats(stats) {
+    const container = document.getElementById("cards-stats-container");
+    const empty = document.getElementById("cards-empty");
+    if (!stats.length) {
+        container.innerHTML = "";
+        empty.classList.remove("hidden");
+        return;
+    }
+    empty.classList.add("hidden");
+
+    container.innerHTML = stats.map(card => {
+        const months = card.months;
+        const monthHeaders = months.map(m =>
+            `<th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">${m.label}</th>`
+        ).join("");
+
+        const conditionRows = [];
+        const hasAnyRule = card.min_transactions != null || card.min_amount != null;
+
+        if (card.min_transactions != null) {
+            const cells = months.map(m => {
+                const met = m.met_transactions;
+                const icon = met === null ? "—" : met
+                    ? `<i class="fas fa-check text-green-500"></i>`
+                    : `<i class="fas fa-times text-red-400"></i>`;
+                return `<td class="px-3 py-2 text-center text-sm">${icon} <span class="text-xs text-gray-500">${m.transaction_count}</span></td>`;
+            }).join("");
+            conditionRows.push(`
+                <tr class="border-t border-gray-100">
+                    <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                        <i class="fas fa-receipt mr-1"></i>Min. ${card.min_transactions} transakcji
+                    </td>
+                    ${cells}
+                </tr>`);
+        }
+
+        if (card.min_amount != null) {
+            const cells = months.map(m => {
+                const met = m.met_amount;
+                const icon = met === null ? "—" : met
+                    ? `<i class="fas fa-check text-green-500"></i>`
+                    : `<i class="fas fa-times text-red-400"></i>`;
+                return `<td class="px-3 py-2 text-center text-sm">${icon} <span class="text-xs text-gray-500">${fmtAmount(m.total_amount)}</span></td>`;
+            }).join("");
+            conditionRows.push(`
+                <tr class="border-t border-gray-100">
+                    <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                        <i class="fas fa-wallet mr-1"></i>Min. ${fmtAmount(card.min_amount)} zł
+                    </td>
+                    ${cells}
+                </tr>`);
+        }
+
+        // Summary row: karta bezpłatna?
+        const summaryCells = months.map(m => {
+            if (!hasAnyRule) {
+                return `<td class="px-3 py-2 text-center">
+                    <button onclick="openCardExpenses(${card.id}, ${m.year}, ${m.month}, '${card.name} — ${m.label}')"
+                        class="text-xs text-primary hover:underline">${m.transaction_count} tr. / ${fmtAmount(m.total_amount)} zł</button>
+                </td>`;
+            }
+            const badge = m.is_free
+                ? `<span class="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Bezpłatna</span>`
+                : `<span class="inline-block bg-red-100 text-red-500 text-xs font-semibold px-2 py-0.5 rounded-full">Płatna</span>`;
+            return `<td class="px-3 py-2 text-center">
+                <button onclick="openCardExpenses(${card.id}, ${m.year}, ${m.month}, '${card.name} — ${m.label}')"
+                    class="block w-full hover:opacity-80">${badge}
+                    <span class="text-xs text-gray-400 block mt-0.5">${m.transaction_count} tr. / ${fmtAmount(m.total_amount)} zł</span>
+                </button>
+            </td>`;
+        }).join("");
+        const summaryRow = `
+            <tr class="border-t border-gray-200 bg-gray-50">
+                <td class="px-3 py-2 text-xs font-semibold text-gray-700">Status</td>
+                ${summaryCells}
+            </tr>`;
+
+        const rulesDesc = buildRulesDescription(card);
+
+        return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                <div>
+                    <span class="font-semibold text-gray-800"><i class="fas fa-credit-card text-primary mr-2"></i>${card.name}</span>
+                    ${card.last_six_digits ? `<span class="ml-2 text-xs text-gray-400">•••• •••• ${card.last_six_digits}</span>` : ""}
+                    ${rulesDesc ? `<span class="ml-3 text-xs text-gray-500">${rulesDesc}</span>` : ""}
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openEditCardModal(${card.id})" class="text-gray-400 hover:text-primary text-sm px-2 py-1 rounded hover:bg-gray-100">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteCard(${card.id}, '${card.name.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-red-500 text-sm px-2 py-1 rounded hover:bg-red-50">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left bg-white">
+                            <th class="px-3 py-2 text-xs font-semibold text-gray-600 w-40">Warunek</th>
+                            ${monthHeaders}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${conditionRows.join("")}
+                        ${summaryRow}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function buildRulesDescription(card) {
+    const parts = [];
+    if (card.min_transactions != null) parts.push(`${card.min_transactions} transakcji`);
+    if (card.min_amount != null) parts.push(`${fmtAmount(card.min_amount)} zł`);
+    if (!parts.length) return "";
+    const logic = card.rules_require_all ? "i" : "lub";
+    return `Bezpłatna gdy: ${parts.join(` ${logic} `)}`;
+}
+
+function fmtAmount(v) {
+    return Number(v).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function openCardExpenses(cardId, year, month, title) {
+    document.getElementById("card-expenses-title").textContent = title;
+    document.getElementById("card-expenses-list").innerHTML = `<p class="text-gray-400 text-sm text-center py-4">Ładowanie...</p>`;
+    document.getElementById("card-expenses-modal").classList.remove("hidden");
+    try {
+        const expenses = await apiRequest("GET", `/cards/${cardId}/expenses?year=${year}&month=${month}`);
+        const list = document.getElementById("card-expenses-list");
+        if (!expenses.length) {
+            list.innerHTML = `<p class="text-gray-400 text-sm text-center py-4">Brak wydatków w tym miesiącu</p>`;
+            return;
+        }
+        list.innerHTML = expenses.map(e => `
+            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div>
+                    <p class="text-sm font-medium text-gray-800">${e.description || "Brak opisu"}</p>
+                    <p class="text-xs text-gray-400">${e.date}${e.category_name ? " · " + e.category_name : ""}</p>
+                </div>
+                <span class="font-semibold text-gray-800">${fmtAmount(e.amount)} zł</span>
+            </div>`).join("");
+    } catch (err) {
+        document.getElementById("card-expenses-list").innerHTML = `<p class="text-red-400 text-sm text-center py-4">${err.message}</p>`;
+    }
+}
+
+function closeCardExpensesModal() {
+    document.getElementById("card-expenses-modal").classList.add("hidden");
+}
+
+function openAddCardModal() {
+    document.getElementById("card-modal-id").value = "";
+    document.getElementById("card-modal-name").value = "";
+    document.getElementById("card-modal-digits").value = "";
+    document.getElementById("card-modal-min-tx").value = "";
+    document.getElementById("card-modal-min-amt").value = "";
+    document.getElementById("card-modal-rules-logic").value = "true";
+    document.getElementById("card-modal-title").textContent = "Dodaj kartę płatniczą";
+    document.getElementById("card-modal-rules-row").classList.add("hidden");
+    document.getElementById("card-modal").classList.remove("hidden");
+    _updateRulesRowVisibility();
+}
+
+async function openEditCardModal(cardId) {
+    try {
+        const card = await apiRequest("GET", `/cards/${cardId}`);
+        document.getElementById("card-modal-id").value = card.id;
+        document.getElementById("card-modal-name").value = card.name;
+        document.getElementById("card-modal-digits").value = card.last_six_digits || "";
+        document.getElementById("card-modal-min-tx").value = card.min_transactions ?? "";
+        document.getElementById("card-modal-min-amt").value = card.min_amount ?? "";
+        document.getElementById("card-modal-rules-logic").value = card.rules_require_all ? "true" : "false";
+        document.getElementById("card-modal-title").textContent = "Edytuj kartę";
+        document.getElementById("card-modal").classList.remove("hidden");
+        _updateRulesRowVisibility();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+function _updateRulesRowVisibility() {
+    const tx = document.getElementById("card-modal-min-tx").value;
+    const amt = document.getElementById("card-modal-min-amt").value;
+    const row = document.getElementById("card-modal-rules-row");
+    if (tx && amt) {
+        row.classList.remove("hidden");
+    } else {
+        row.classList.add("hidden");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    ["card-modal-min-tx", "card-modal-min-amt"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("input", _updateRulesRowVisibility);
+    });
+});
+
+function closeCardModal() {
+    document.getElementById("card-modal").classList.add("hidden");
+}
+
+async function saveCard() {
+    const id = document.getElementById("card-modal-id").value;
+    const name = document.getElementById("card-modal-name").value.trim();
+    if (!name) { showToast("Podaj nazwę karty", "error"); return; }
+
+    const digits = document.getElementById("card-modal-digits").value.trim();
+    if (digits && digits.length !== 6) { showToast("Numer karty musi mieć dokładnie 6 cyfr", "error"); return; }
+
+    const minTx = document.getElementById("card-modal-min-tx").value;
+    const minAmt = document.getElementById("card-modal-min-amt").value;
+    const requireAll = document.getElementById("card-modal-rules-logic").value === "true";
+
+    const payload = {
+        name,
+        last_six_digits: digits || null,
+        min_transactions: minTx ? parseInt(minTx) : null,
+        min_amount: minAmt ? parseFloat(minAmt) : null,
+        rules_require_all: requireAll,
+    };
+
+    try {
+        if (id) {
+            await apiRequest("PUT", `/cards/${id}`, payload);
+            showToast("Karta zaktualizowana", "success");
+        } else {
+            await apiRequest("POST", "/cards/", payload);
+            showToast("Karta dodana", "success");
+        }
+        closeCardModal();
+        loadCardsView();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+async function deleteCard(cardId, cardName) {
+    if (!confirm(`Usunąć kartę "${cardName}"? Wydatki zostaną odpięte.`)) return;
+    try {
+        await apiRequest("DELETE", `/cards/${cardId}`);
+        showToast("Karta usunięta", "success");
+        loadCardsView();
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}

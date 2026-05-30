@@ -42,6 +42,7 @@ class ExpenseBase(BaseModel):
     category_id: Optional[int] = Field(
         None, description="ID kategorii ogólnej dla całego wydatku (opcjonalne)"
     )
+    card_id: Optional[int] = Field(None, description="ID karty płatniczej (opcjonalne)")
 
 
 class ExpenseCreate(ExpenseBase):
@@ -59,6 +60,7 @@ class ExpenseUpdate(BaseModel):
     description: Optional[str] = None
     date: Optional[DateType] = None
     category_id: Optional[int] = None
+    card_id: Optional[int] = None
     receipt_image_path: Optional[str] = Field(
         None, description="Ścieżka do zdjęcia paragonu (null aby usunąć)"
     )
@@ -73,6 +75,7 @@ class ExpenseResponse(ExpenseBase):
     id: int
     user_id: int
     category_name: Optional[str] = None
+    card_name: Optional[str] = None
     metadata_ai: Optional[str] = None
     receipt_image_path: Optional[str] = Field(
         None, description="Ścieżka do przetworzonego zdjęcia paragonu na dysku"
