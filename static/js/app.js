@@ -1749,6 +1749,7 @@ async function loadAdminConfig() {
     try {
         const cfg = await apiRequest("GET", "/admin/config");
         document.getElementById("cfg-registration-enabled").checked = cfg.registration_enabled;
+        document.getElementById("cfg-enable-payment-cards").checked = cfg.enable_payment_cards;
         document.getElementById("cfg-app-name").value = cfg.app_name;
         document.getElementById("cfg-debug").checked = cfg.debug;
         document.getElementById("cfg-secret-key").value = cfg.SECRET_KEY;
@@ -1777,6 +1778,7 @@ async function saveAdminConfig(event) {
 
     const payload = {
         registration_enabled: document.getElementById("cfg-registration-enabled").checked,
+        enable_payment_cards: document.getElementById("cfg-enable-payment-cards").checked,
         app_name: document.getElementById("cfg-app-name").value,
         debug: document.getElementById("cfg-debug").checked,
         SECRET_KEY: document.getElementById("cfg-secret-key").value,
