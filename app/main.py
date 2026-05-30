@@ -3,6 +3,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 import os
+
+APP_VERSION = Path("VERSION").read_text().strip()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    version="0.2.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -73,4 +75,5 @@ async def root(request: Request):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "enable_payment_cards": settings.enable_payment_cards,
+        "app_version": APP_VERSION,
     })
