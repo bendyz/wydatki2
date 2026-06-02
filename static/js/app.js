@@ -2138,6 +2138,7 @@ function _fmtAsset(v) { return Number(v).toLocaleString("pl-PL", { minimumFracti
 
 let _assetPassword = null;
 let _assetsChart = null;
+let _assetAccountsCache = [];
 const ACCOUNT_TYPE_LABELS = {
     cash: "Gotówka", bank: "Konto bankowe", savings: "Oszczędności",
     etf: "ETF / akcje", crypto: "Kryptowaluty", foreign: "Waluta obca", other: "Inne",
@@ -2174,7 +2175,7 @@ async function loadAssetsView() {
     if (!status.configured) {
         // First-time setup
         document.getElementById("assets-gate-title").textContent = "Ustaw hasło modułu";
-        document.getElementById("assets-gate-desc").textContent = "Dane zostaną zaszyfrowane tym hasłem. Jeśli je zapomnisz — nie odszyfruje danych.";
+        document.getElementById("assets-gate-desc").textContent = "Dane zostaną zaszyfrowane tym hasłem (min. 8 znaków). Jeśli je zapomnisz — nie odszyfruje danych.";
         document.getElementById("assets-gate-btn-label").textContent = "Utwórz hasło";
         gate.dataset.mode = "setup";
         document.getElementById("assets-pwd-input").value = "";
@@ -2326,6 +2327,7 @@ function renderAssetsChart(summary) {
 }
 
 function renderAssetsAccounts(accounts) {
+    _assetAccountsCache = accounts;
     const el = document.getElementById("assets-accounts-list");
     if (!accounts.length) {
         el.innerHTML = `<p class="text-sm text-gray-400 text-center py-4">Brak kont. Dodaj pierwsze.</p>`;
@@ -2333,17 +2335,18 @@ function renderAssetsAccounts(accounts) {
     }
     el.innerHTML = accounts.map(acc => {
         const icon = ACCOUNT_TYPE_ICONS[acc.account_type] || "fa-wallet";
-        const typeLabel = ACCOUNT_TYPE_LABELS[acc.account_type] || acc.account_type;
+        const typeLabel = escapeHtml(ACCOUNT_TYPE_LABELS[acc.account_type] || acc.account_type);
+        const currency = escapeHtml(acc.currency);
         const amount = acc.latest_amount != null
-            ? `<span class="text-lg font-bold text-gray-900">${_fmtAsset(acc.latest_amount)} <span class="text-sm font-normal text-gray-400">${acc.currency}</span></span>`
+            ? `<span class="text-lg font-bold text-gray-900">${_fmtAsset(acc.latest_amount)} <span class="text-sm font-normal text-gray-400">${currency}</span></span>`
             : `<span class="text-sm text-gray-400 italic">brak wpisów</span>`;
         const dateLabel = acc.latest_date ? `<span class="text-xs text-gray-400 ml-2">${acc.latest_date}</span>` : "";
 
         const snapshotRows = acc.snapshots.slice(0, 5).map(s =>
             `<tr class="text-xs text-gray-600">
                 <td class="py-0.5 pr-4">${s.recorded_at}</td>
-                <td class="py-0.5 pr-4 font-medium">${_fmtAsset(s.amount)} ${acc.currency}</td>
-                <td class="py-0.5 text-gray-400">${s.note || ""}</td>
+                <td class="py-0.5 pr-4 font-medium">${_fmtAsset(s.amount)} ${currency}</td>
+                <td class="py-0.5 text-gray-400">${escapeHtml(s.note || "")}</td>
                 <td class="py-0.5 text-right">
                     <button onclick="deleteSnapshot(${s.id})" class="text-gray-300 hover:text-danger ml-2"><i class="fas fa-times text-xs"></i></button>
                 </td>
@@ -2358,7 +2361,7 @@ function renderAssetsAccounts(accounts) {
                 <i class="fas ${icon}"></i>
               </div>
               <div>
-                <p class="font-semibold text-gray-800 text-sm">${acc.name}</p>
+                <p class="font-semibold text-gray-800 text-sm">${escapeHtml(acc.name)}</p>
                 <p class="text-xs text-gray-400">${typeLabel}</p>
               </div>
             </div>
@@ -2372,11 +2375,11 @@ function renderAssetsAccounts(accounts) {
             ${acc.snapshots.length > 5 ? `<p class="text-xs text-gray-400 mt-1">+ ${acc.snapshots.length - 5} wcześniejszych wpisów</p>` : ""}
           </div>` : ""}
           <div class="mt-3 flex gap-2">
-            <button onclick="openAddSnapshotModal(${acc.id}, '${acc.name.replace(/'/g, "\\'")}')"
+            <button onclick="openAddSnapshotModal(${acc.id})"
               class="px-3 py-1 bg-primary text-white text-xs rounded-md hover:bg-blue-700">
               <i class="fas fa-plus mr-1"></i>Dodaj wpis
             </button>
-            <button onclick="deleteAssetAccount(${acc.id}, '${acc.name.replace(/'/g, "\\'")}')"
+            <button onclick="deleteAssetAccount(${acc.id})"
               class="px-3 py-1 border border-gray-300 text-gray-500 text-xs rounded-md hover:bg-gray-50">
               <i class="fas fa-trash mr-1"></i>Usuń konto
             </button>
@@ -2414,10 +2417,11 @@ async function saveNewAccount() {
     }
 }
 
-function openAddSnapshotModal(accountId, accountName) {
+function openAddSnapshotModal(accountId) {
+    const acc = _assetAccountsCache.find(a => a.id === accountId);
     document.getElementById("snapshot-account-id").value = accountId;
     document.getElementById("snapshot-modal-title").innerHTML =
-        `<i class="fas fa-edit text-primary mr-2"></i>Wpis — ${accountName}`;
+        `<i class="fas fa-edit text-primary mr-2"></i>Wpis — ${escapeHtml(acc ? acc.name : "")}`;
     document.getElementById("snapshot-amount").value = "";
     document.getElementById("snapshot-date").valueAsDate = new Date();
     document.getElementById("snapshot-note").value = "";
@@ -2460,8 +2464,9 @@ async function deleteSnapshot(snapshotId) {
     }
 }
 
-async function deleteAssetAccount(accountId, accountName) {
-    if (!confirm(`Usunąć konto "${accountName}" i wszystkie jego wpisy?`)) return;
+async function deleteAssetAccount(accountId) {
+    const acc = _assetAccountsCache.find(a => a.id === accountId);
+    if (!confirm(`Usunąć konto "${acc ? acc.name : ""}" i wszystkie jego wpisy?`)) return;
     try {
         await assetsApiRequest("DELETE", `/accounts/${accountId}`);
         showToast("Konto usunięte", "success");

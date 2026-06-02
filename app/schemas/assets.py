@@ -1,11 +1,11 @@
 import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AssetSetupRequest(BaseModel):
-    password: str
+    password: str = Field(min_length=8)
 
 
 class AssetVerifyRequest(BaseModel):
