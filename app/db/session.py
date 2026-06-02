@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -9,6 +11,11 @@ class Base(DeclarativeBase):
 
     pass
 
+
+# Ensure the SQLite database directory exists (volume mount may replace image dirs)
+_db_url = settings.database.url
+if _db_url.startswith("sqlite:///"):
+    Path(_db_url[len("sqlite:///"):]).parent.mkdir(parents=True, exist_ok=True)
 
 # Silnik połączenia z bazą SQLite
 engine = create_engine(
