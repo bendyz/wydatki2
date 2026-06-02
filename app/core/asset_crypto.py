@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
 _VERIFICATION_PLAINTEXT = b"wydatki-majatek-v1"
-_PBKDF2_ITERATIONS = 200_000
+_PBKDF2_ITERATIONS = 600_000
 
 
 def _derive_key(password: str, salt_hex: str) -> Fernet:
