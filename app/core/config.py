@@ -48,6 +48,7 @@ class Settings(BaseModel):
     allowed_origins: List[str] = Field(default_factory=lambda: ["*"])
 
     enable_payment_cards: bool = False
+    enable_assets: bool = False
 
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -86,6 +87,7 @@ class Settings(BaseModel):
             "debug": self.debug,
             "registration_enabled": self.registration_enabled,
             "enable_payment_cards": self.enable_payment_cards,
+            "enable_assets": self.enable_assets,
             "SECRET_KEY": self.SECRET_KEY,
             "ALGORITHM": self.ALGORITHM,
             "ACCESS_TOKEN_EXPIRE_MINUTES": self.ACCESS_TOKEN_EXPIRE_MINUTES,

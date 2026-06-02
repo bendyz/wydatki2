@@ -70,6 +70,8 @@ class User(Base):
     categories = relationship("Category", back_populates="user")
     tags = relationship("Tag", back_populates="user")
     payment_cards = relationship("PaymentCard", back_populates="user")
+    asset_key_config = relationship("AssetKeyConfig", back_populates="user", uselist=False)
+    asset_accounts = relationship("AssetAccount", back_populates="user")
 
 
 class Category(Base):
@@ -133,6 +135,43 @@ class ExpenseItem(Base):
     # Relationships
     expense = relationship("Expense", back_populates="items")
     category = relationship("Category", back_populates="items")
+
+
+class AssetKeyConfig(Base):
+    __tablename__ = "asset_key_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    salt = Column(String, nullable=False)               # hex-encoded 16 random bytes
+    verification_token = Column(String, nullable=False) # Fernet-encrypted known plaintext
+
+    user = relationship("User", back_populates="asset_key_config")
+
+
+class AssetAccount(Base):
+    __tablename__ = "asset_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name_enc = Column(String, nullable=False)                    # encrypted
+    account_type = Column(String, nullable=False, default="other")  # cash/bank/etf/crypto/foreign/other
+    currency = Column(String, nullable=False, default="PLN")
+    sort_order = Column(Integer, default=0)
+
+    user = relationship("User", back_populates="asset_accounts")
+    snapshots = relationship("AssetSnapshot", back_populates="account", cascade="all, delete-orphan", order_by="AssetSnapshot.recorded_at")
+
+
+class AssetSnapshot(Base):
+    __tablename__ = "asset_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("asset_accounts.id"), nullable=False)
+    amount_enc = Column(String, nullable=False)  # encrypted float as string
+    recorded_at = Column(Date, nullable=False)
+    note_enc = Column(String, nullable=True)     # encrypted note, optional
+
+    account = relationship("AssetAccount", back_populates="snapshots")
 
 
 class Subscription(Base):

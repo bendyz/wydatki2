@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     admin,
     ai,
+    assets,
     auth,
     cards,
     categories,
@@ -27,3 +28,4 @@ api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
 api_router.include_router(cards.router, prefix="/cards", tags=["cards"])
+api_router.include_router(assets.router, prefix="/assets", tags=["assets"])

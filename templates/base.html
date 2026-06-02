@@ -75,6 +75,11 @@
                         <i class="fas fa-credit-card mr-1"></i> Karty
                     </button>
                     {% endif %}
+                    {% if enable_assets %}
+                    <button onclick="showView('assets')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                        <i class="fas fa-piggy-bank mr-1"></i> Majątek
+                    </button>
+                    {% endif %}
                     <button id="nav-admin-btn" onclick="showView('admin')" class="hidden nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                         <i class="fas fa-cog mr-1"></i> Admin
                     </button>
@@ -114,6 +119,11 @@
                 {% if enable_payment_cards %}
                 <button onclick="showView('cards'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
                     <i class="fas fa-credit-card mr-2"></i> Karty
+                </button>
+                {% endif %}
+                {% if enable_assets %}
+                <button onclick="showView('assets'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
+                    <i class="fas fa-piggy-bank mr-2"></i> Majątek
                 </button>
                 {% endif %}
                 <button id="nav-admin-btn-mobile" onclick="showView('admin'); toggleMobileMenu()" class="hidden block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
