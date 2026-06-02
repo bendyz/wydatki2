@@ -2256,28 +2256,70 @@ function renderAssetsChart(summary) {
 
     const labels = summary.points.map(p => p.date);
     const accountIds = summary.accounts.map(a => String(a.id));
-    const colors = ["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#f97316"];
+    const accColors = ["#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#f97316","#64748b"];
 
-    const datasets = accountIds.map((id, i) => ({
+    // Total — gruba linia, wypełnienie gradientowe
+    const totalData = summary.points.map(p => p.total);
+    const gradient = ctx.getContext("2d").createLinearGradient(0, 0, 0, ctx.offsetHeight || 200);
+    gradient.addColorStop(0, "#3b82f622");
+    gradient.addColorStop(1, "#3b82f600");
+
+    const totalDataset = {
+        label: "Łącznie",
+        data: totalData,
+        borderColor: "#3b82f6",
+        backgroundColor: gradient,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.35,
+        pointRadius: totalData.length <= 12 ? 4 : 2,
+        pointHoverRadius: 6,
+        order: 0,
+    };
+
+    // Poszczególne konta — cienkie, półprzezroczyste
+    const accDatasets = accountIds.map((id, i) => ({
         label: summary.accounts[i].name,
         data: summary.points.map(p => p.by_account[id] ?? null),
-        borderColor: colors[i % colors.length],
-        backgroundColor: colors[i % colors.length] + "22",
-        fill: true,
-        tension: 0.3,
+        borderColor: accColors[i % accColors.length],
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        fill: false,
+        tension: 0.35,
         spanGaps: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        order: i + 1,
     }));
 
     _assetsChart = new Chart(ctx, {
         type: "line",
-        data: { labels, datasets },
+        data: { labels, datasets: [totalDataset, ...accDatasets] },
         options: {
             responsive: true,
             interaction: { mode: "index", intersect: false },
-            plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        boxWidth: 12,
+                        font: { size: 11 },
+                        filter: item => item.datasetIndex === 0 || summary.accounts.length > 1,
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${_fmtAsset(ctx.parsed.y)}`,
+                    },
+                },
+            },
             scales: {
                 x: { ticks: { font: { size: 10 } } },
-                y: { ticks: { font: { size: 10 }, callback: v => _fmtAsset(v) } },
+                y: {
+                    ticks: { font: { size: 10 }, callback: v => _fmtAsset(v) },
+                    grid: { color: "#f1f5f9" },
+                },
             },
         },
     });
