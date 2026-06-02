@@ -75,5 +75,6 @@ async def root(request: Request):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "enable_payment_cards": settings.enable_payment_cards,
+        "enable_assets": settings.enable_assets,
         "app_version": APP_VERSION,
     })

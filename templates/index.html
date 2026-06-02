@@ -14,5 +14,8 @@
   {% if enable_payment_cards %}
   {% include "views/cards.html" %}
   {% endif %}
+  {% if enable_assets %}
+  {% include "views/assets.html" %}
+  {% endif %}
   {% include "partials/draft_modal.html" %}
 {% endblock %}

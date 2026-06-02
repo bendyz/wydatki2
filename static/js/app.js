@@ -145,6 +145,7 @@ function showView(viewName) {
     if (viewName === "admin") { loadAdminConfig(); loadAdminUsers(); }
     if (viewName === "tags") loadTagsView();
     if (viewName === "cards") loadCardsView();
+    if (viewName === "assets") loadAssetsView();
     if (viewName === "add-expense") {
         loadCategoriesSelect();
         loadCardsSelect("manual-card");
@@ -1776,6 +1777,7 @@ async function loadAdminConfig() {
         const cfg = await apiRequest("GET", "/admin/config");
         document.getElementById("cfg-registration-enabled").checked = cfg.registration_enabled;
         document.getElementById("cfg-enable-payment-cards").checked = cfg.enable_payment_cards;
+        document.getElementById("cfg-enable-assets").checked = cfg.enable_assets;
         document.getElementById("cfg-app-name").value = cfg.app_name;
         document.getElementById("cfg-debug").checked = cfg.debug;
         document.getElementById("cfg-secret-key").value = cfg.SECRET_KEY;
@@ -1805,6 +1807,7 @@ async function saveAdminConfig(event) {
     const payload = {
         registration_enabled: document.getElementById("cfg-registration-enabled").checked,
         enable_payment_cards: document.getElementById("cfg-enable-payment-cards").checked,
+        enable_assets: document.getElementById("cfg-enable-assets").checked,
         app_name: document.getElementById("cfg-app-name").value,
         debug: document.getElementById("cfg-debug").checked,
         SECRET_KEY: document.getElementById("cfg-secret-key").value,
@@ -2127,5 +2130,349 @@ async function deleteCard(cardId, cardName) {
         loadCardsView();
     } catch (e) {
         showToast(e.message, "error");
+    }
+}
+
+// ==================== MAJĄTEK ====================
+function _fmtAsset(v) { return Number(v).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+let _assetPassword = null;
+let _assetsChart = null;
+let _assetAccountsCache = [];
+const ACCOUNT_TYPE_LABELS = {
+    cash: "Gotówka", bank: "Konto bankowe", savings: "Oszczędności",
+    etf: "ETF / akcje", crypto: "Kryptowaluty", foreign: "Waluta obca", other: "Inne",
+};
+const ACCOUNT_TYPE_ICONS = {
+    cash: "fa-money-bill-wave", bank: "fa-university", savings: "fa-piggy-bank",
+    etf: "fa-chart-line", crypto: "fa-coins", foreign: "fa-globe", other: "fa-wallet",
+};
+
+async function assetsApiRequest(method, endpoint, body = null) {
+    const headers = { "Authorization": `Bearer ${getToken()}` };
+    if (_assetPassword) headers["x-asset-password"] = _assetPassword;
+    if (body) headers["Content-Type"] = "application/json";
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
+    const response = await fetch(`${API_URL}/assets${endpoint}`, options);
+    if (response.status === 401) { logout(); throw new Error("Sesja wygasła"); }
+    if (response.status === 403) throw new Error("__wrong_password__");
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: "Błąd serwera" }));
+        throw new Error(err.detail || "Błąd serwera");
+    }
+    if (response.status === 204) return null;
+    return response.json();
+}
+
+async function loadAssetsView() {
+    const gate = document.getElementById("assets-gate");
+    const content = document.getElementById("assets-content");
+    gate.classList.add("hidden");
+    content.classList.add("hidden");
+
+    const status = await assetsApiRequest("GET", "/setup-status");
+    if (!status.configured) {
+        // First-time setup
+        document.getElementById("assets-gate-title").textContent = "Ustaw hasło modułu";
+        document.getElementById("assets-gate-desc").textContent = "Dane zostaną zaszyfrowane tym hasłem (min. 8 znaków). Jeśli je zapomnisz — nie odszyfruje danych.";
+        document.getElementById("assets-gate-btn-label").textContent = "Utwórz hasło";
+        gate.dataset.mode = "setup";
+        document.getElementById("assets-pwd-input").value = "";
+    } else if (!_assetPassword) {
+        document.getElementById("assets-gate-title").textContent = "Podaj hasło modułu";
+        document.getElementById("assets-gate-desc").textContent = "Dane są zaszyfrowane. Hasło nie jest nigdzie zapisane.";
+        document.getElementById("assets-gate-btn-label").textContent = "Odblokuj";
+        gate.dataset.mode = "unlock";
+        document.getElementById("assets-pwd-input").value = "";
+    } else {
+        await renderAssetsContent();
+        return;
+    }
+    document.getElementById("assets-gate-error").classList.add("hidden");
+    gate.classList.remove("hidden");
+    setTimeout(() => document.getElementById("assets-pwd-input").focus(), 100);
+}
+
+async function assetsUnlock() {
+    const pwd = document.getElementById("assets-pwd-input").value;
+    if (!pwd) return;
+    const gate = document.getElementById("assets-gate");
+    const errEl = document.getElementById("assets-gate-error");
+
+    if (gate.dataset.mode === "setup") {
+        try {
+            await assetsApiRequest("POST", "/setup", { password: pwd });
+            _assetPassword = pwd;
+            gate.classList.add("hidden");
+            await renderAssetsContent();
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.classList.remove("hidden");
+        }
+        return;
+    }
+
+    // unlock — verify first
+    const result = await assetsApiRequest("POST", "/verify", { password: pwd });
+    if (!result.valid) {
+        errEl.classList.remove("hidden");
+        return;
+    }
+    errEl.classList.add("hidden");
+    _assetPassword = pwd;
+    gate.classList.add("hidden");
+    await renderAssetsContent();
+}
+
+function assetsLock() {
+    _assetPassword = null;
+    document.getElementById("assets-content").classList.add("hidden");
+    loadAssetsView();
+}
+
+async function renderAssetsContent() {
+    document.getElementById("assets-content").classList.remove("hidden");
+    try {
+        const summary = await assetsApiRequest("GET", "/summary");
+        renderAssetsAccounts(summary.accounts);
+        renderAssetsChart(summary);
+        renderAssetsTotal(summary);
+    } catch (e) {
+        if (e.message === "__wrong_password__") { _assetPassword = null; loadAssetsView(); }
+        else showToast(e.message, "error");
+    }
+}
+
+function renderAssetsTotal(summary) {
+    const lastPoint = summary.points.at(-1);
+    const total = lastPoint ? lastPoint.total : 0;
+    document.getElementById("assets-total").textContent = _fmtAsset(total);
+}
+
+function renderAssetsChart(summary) {
+    const ctx = document.getElementById("assets-chart");
+    if (_assetsChart) { _assetsChart.destroy(); _assetsChart = null; }
+    if (!summary.points.length) return;
+
+    const labels = summary.points.map(p => p.date);
+    const accountIds = summary.accounts.map(a => String(a.id));
+    const accColors = ["#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#f97316","#64748b"];
+
+    // Total — gruba linia, wypełnienie gradientowe
+    const totalData = summary.points.map(p => p.total);
+    const gradient = ctx.getContext("2d").createLinearGradient(0, 0, 0, ctx.offsetHeight || 200);
+    gradient.addColorStop(0, "#3b82f622");
+    gradient.addColorStop(1, "#3b82f600");
+
+    const totalDataset = {
+        label: "Łącznie",
+        data: totalData,
+        borderColor: "#3b82f6",
+        backgroundColor: gradient,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.35,
+        pointRadius: totalData.length <= 12 ? 4 : 2,
+        pointHoverRadius: 6,
+        order: 0,
+    };
+
+    // Poszczególne konta — cienkie, półprzezroczyste
+    const accDatasets = accountIds.map((id, i) => ({
+        label: summary.accounts[i].name,
+        data: summary.points.map(p => p.by_account[id] ?? null),
+        borderColor: accColors[i % accColors.length],
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        fill: false,
+        tension: 0.35,
+        spanGaps: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        order: i + 1,
+    }));
+
+    _assetsChart = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets: [totalDataset, ...accDatasets] },
+        options: {
+            responsive: true,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        boxWidth: 12,
+                        font: { size: 11 },
+                        filter: item => item.datasetIndex === 0 || summary.accounts.length > 1,
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${_fmtAsset(ctx.parsed.y)}`,
+                    },
+                },
+            },
+            scales: {
+                x: { ticks: { font: { size: 10 } } },
+                y: {
+                    ticks: { font: { size: 10 }, callback: v => _fmtAsset(v) },
+                    grid: { color: "#f1f5f9" },
+                },
+            },
+        },
+    });
+}
+
+function renderAssetsAccounts(accounts) {
+    _assetAccountsCache = accounts;
+    const el = document.getElementById("assets-accounts-list");
+    if (!accounts.length) {
+        el.innerHTML = `<p class="text-sm text-gray-400 text-center py-4">Brak kont. Dodaj pierwsze.</p>`;
+        return;
+    }
+    el.innerHTML = accounts.map(acc => {
+        const icon = ACCOUNT_TYPE_ICONS[acc.account_type] || "fa-wallet";
+        const typeLabel = escapeHtml(ACCOUNT_TYPE_LABELS[acc.account_type] || acc.account_type);
+        const currency = escapeHtml(acc.currency);
+        const amount = acc.latest_amount != null
+            ? `<span class="text-lg font-bold text-gray-900">${_fmtAsset(acc.latest_amount)} <span class="text-sm font-normal text-gray-400">${currency}</span></span>`
+            : `<span class="text-sm text-gray-400 italic">brak wpisów</span>`;
+        const dateLabel = acc.latest_date ? `<span class="text-xs text-gray-400 ml-2">${acc.latest_date}</span>` : "";
+
+        const snapshotRows = acc.snapshots.slice(0, 5).map(s =>
+            `<tr class="text-xs text-gray-600">
+                <td class="py-0.5 pr-4">${s.recorded_at}</td>
+                <td class="py-0.5 pr-4 font-medium">${_fmtAsset(s.amount)} ${currency}</td>
+                <td class="py-0.5 text-gray-400">${escapeHtml(s.note || "")}</td>
+                <td class="py-0.5 text-right">
+                    <button onclick="deleteSnapshot(${s.id})" class="text-gray-300 hover:text-danger ml-2"><i class="fas fa-times text-xs"></i></button>
+                </td>
+            </tr>`
+        ).join("");
+
+        return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-primary">
+                <i class="fas ${icon}"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-gray-800 text-sm">${escapeHtml(acc.name)}</p>
+                <p class="text-xs text-gray-400">${typeLabel}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              ${amount}${dateLabel}
+            </div>
+          </div>
+          ${snapshotRows ? `
+          <div class="mt-3 border-t pt-2 overflow-x-auto">
+            <table class="w-full"><tbody>${snapshotRows}</tbody></table>
+            ${acc.snapshots.length > 5 ? `<p class="text-xs text-gray-400 mt-1">+ ${acc.snapshots.length - 5} wcześniejszych wpisów</p>` : ""}
+          </div>` : ""}
+          <div class="mt-3 flex gap-2">
+            <button onclick="openAddSnapshotModal(${acc.id})"
+              class="px-3 py-1 bg-primary text-white text-xs rounded-md hover:bg-blue-700">
+              <i class="fas fa-plus mr-1"></i>Dodaj wpis
+            </button>
+            <button onclick="deleteAssetAccount(${acc.id})"
+              class="px-3 py-1 border border-gray-300 text-gray-500 text-xs rounded-md hover:bg-gray-50">
+              <i class="fas fa-trash mr-1"></i>Usuń konto
+            </button>
+          </div>
+        </div>`;
+    }).join("");
+}
+
+function openAddAccountModal() {
+    document.getElementById("acc-name").value = "";
+    document.getElementById("acc-type").value = "bank";
+    document.getElementById("acc-currency").value = "PLN";
+    document.getElementById("add-account-modal").classList.remove("hidden");
+    setTimeout(() => document.getElementById("acc-name").focus(), 100);
+}
+function closeAddAccountModal() {
+    document.getElementById("add-account-modal").classList.add("hidden");
+}
+
+async function saveNewAccount() {
+    const name = document.getElementById("acc-name").value.trim();
+    if (!name) { showToast("Podaj nazwę konta", "error"); return; }
+    try {
+        await assetsApiRequest("POST", "/accounts", {
+            name,
+            account_type: document.getElementById("acc-type").value,
+            currency: document.getElementById("acc-currency").value.trim() || "PLN",
+        });
+        closeAddAccountModal();
+        showToast("Konto dodane", "success");
+        renderAssetsContent();
+    } catch (e) {
+        if (e.message === "__wrong_password__") { _assetPassword = null; loadAssetsView(); }
+        else showToast(e.message, "error");
+    }
+}
+
+function openAddSnapshotModal(accountId) {
+    const acc = _assetAccountsCache.find(a => a.id === accountId);
+    document.getElementById("snapshot-account-id").value = accountId;
+    document.getElementById("snapshot-modal-title").innerHTML =
+        `<i class="fas fa-edit text-primary mr-2"></i>Wpis — ${escapeHtml(acc ? acc.name : "")}`;
+    document.getElementById("snapshot-amount").value = "";
+    document.getElementById("snapshot-date").valueAsDate = new Date();
+    document.getElementById("snapshot-note").value = "";
+    document.getElementById("add-snapshot-modal").classList.remove("hidden");
+    setTimeout(() => document.getElementById("snapshot-amount").focus(), 100);
+}
+function closeAddSnapshotModal() {
+    document.getElementById("add-snapshot-modal").classList.add("hidden");
+}
+
+async function saveSnapshot() {
+    const accountId = document.getElementById("snapshot-account-id").value;
+    const amount = parseFloat(document.getElementById("snapshot-amount").value);
+    const date = document.getElementById("snapshot-date").value;
+    const note = document.getElementById("snapshot-note").value.trim() || null;
+    if (isNaN(amount)) { showToast("Podaj kwotę", "error"); return; }
+    if (!date) { showToast("Podaj datę", "error"); return; }
+    try {
+        await assetsApiRequest("POST", `/accounts/${accountId}/snapshots`, {
+            amount, recorded_at: date, note,
+        });
+        closeAddSnapshotModal();
+        showToast("Wpis dodany", "success");
+        renderAssetsContent();
+    } catch (e) {
+        if (e.message === "__wrong_password__") { _assetPassword = null; loadAssetsView(); }
+        else showToast(e.message, "error");
+    }
+}
+
+async function deleteSnapshot(snapshotId) {
+    if (!confirm("Usunąć ten wpis?")) return;
+    try {
+        await assetsApiRequest("DELETE", `/snapshots/${snapshotId}`);
+        showToast("Wpis usunięty", "success");
+        renderAssetsContent();
+    } catch (e) {
+        if (e.message === "__wrong_password__") { _assetPassword = null; loadAssetsView(); }
+        else showToast(e.message, "error");
+    }
+}
+
+async function deleteAssetAccount(accountId) {
+    const acc = _assetAccountsCache.find(a => a.id === accountId);
+    if (!confirm(`Usunąć konto "${acc ? acc.name : ""}" i wszystkie jego wpisy?`)) return;
+    try {
+        await assetsApiRequest("DELETE", `/accounts/${accountId}`);
+        showToast("Konto usunięte", "success");
+        renderAssetsContent();
+    } catch (e) {
+        if (e.message === "__wrong_password__") { _assetPassword = null; loadAssetsView(); }
+        else showToast(e.message, "error");
     }
 }

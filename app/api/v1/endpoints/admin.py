@@ -18,6 +18,7 @@ class AdminConfigSchema(BaseModel):
     debug: bool
     registration_enabled: bool
     enable_payment_cards: bool
+    enable_assets: bool
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     server_host: str
@@ -39,6 +40,7 @@ def _settings_to_schema() -> AdminConfigSchema:
         debug=settings.debug,
         registration_enabled=settings.registration_enabled,
         enable_payment_cards=settings.enable_payment_cards,
+        enable_assets=settings.enable_assets,
         SECRET_KEY=settings.SECRET_KEY,
         ACCESS_TOKEN_EXPIRE_MINUTES=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
         server_host=settings.server.host,
@@ -84,6 +86,7 @@ def update_config(data: AdminConfigSchema, _=Depends(get_current_admin)):
     settings.debug = data.debug
     settings.registration_enabled = data.registration_enabled
     settings.enable_payment_cards = data.enable_payment_cards
+    settings.enable_assets = data.enable_assets
     settings.SECRET_KEY = data.SECRET_KEY
     settings.ACCESS_TOKEN_EXPIRE_MINUTES = data.ACCESS_TOKEN_EXPIRE_MINUTES
     settings.server.host = data.server_host
