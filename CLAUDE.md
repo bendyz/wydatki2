@@ -60,3 +60,10 @@ Both AI endpoints return `ExpenseDraft` (schema in `app/schemas/ai_draft.py`) fo
 
 ### Personal context
 `personal_context` in `config.yaml` is a list of user-specific facts injected into every AI system prompt (e.g., car name, home city, card names). Add new facts there to improve categorization without touching code.
+
+### API spec (for Android / external clients)
+Full OpenAPI 3.1 spec is exported to `docs/api.json`. Regenerate after any API change:
+```bash
+python scripts/export_openapi.py
+```
+The spec covers all endpoints, request/response schemas, and auth (Bearer JWT). When working on the Android app, read `docs/api.json` instead of running the server.
