@@ -36,7 +36,7 @@ class ExpenseItemResponse(ExpenseItemBase):
 class ExpenseBase(BaseModel):
     """Bazowy schemat wydatku"""
 
-    amount: float = Field(..., gt=0, description="Całkowita kwota wydatku")
+    amount: float = Field(..., ne=0, description="Całkowita kwota wydatku")
     description: Optional[str] = Field(None, description="Opis lub nazwa sklepu")
     date: DateType = Field(..., description="Data wydatku")
     category_id: Optional[int] = Field(
@@ -56,7 +56,7 @@ class ExpenseCreate(ExpenseBase):
 class ExpenseUpdate(BaseModel):
     """Schemat do aktualizacji wydatku (wszystkie pola opcjonalne)"""
 
-    amount: Optional[float] = Field(None, gt=0)
+    amount: Optional[float] = Field(None, ne=0)
     description: Optional[str] = None
     date: Optional[DateType] = None
     category_id: Optional[int] = None
