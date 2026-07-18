@@ -178,18 +178,37 @@
           </div>
 
           <!-- Receipt image -->
-          <div id="modal-receipt-section" class="hidden">
+          <div>
             <label class="block text-xs font-medium text-gray-500 mb-2">Zdjęcie paragonu</label>
-            <div class="flex justify-center">
-              <img id="modal-receipt-img"
-                class="max-h-48 w-auto rounded-lg shadow cursor-pointer hover:opacity-90 transition-opacity border border-gray-200"
-                onclick="openReceiptFullscreen()"
-                title="Kliknij aby powiększyć" />
+            <div id="modal-receipt-section" class="hidden">
+              <div class="flex justify-center">
+                <img id="modal-receipt-img"
+                  class="max-h-48 w-auto rounded-lg shadow cursor-pointer hover:opacity-90 transition-opacity border border-gray-200"
+                  onclick="openReceiptFullscreen()"
+                  title="Kliknij aby powiększyć" />
+              </div>
+              <div class="flex gap-3 mt-2">
+                <button onclick="openReceiptFullscreen()"
+                  class="flex-1 text-xs text-primary hover:underline text-center">
+                  <i class="fas fa-expand-alt mr-1"></i>Powiększ
+                </button>
+                <button onclick="document.getElementById('modal-receipt-file-input').click()"
+                  class="flex-1 text-xs text-primary hover:underline text-center">
+                  <i class="fas fa-camera mr-1"></i>Zmień
+                </button>
+                <button onclick="removeExpenseReceipt()"
+                  class="flex-1 text-xs text-danger hover:underline text-center">
+                  <i class="fas fa-trash mr-1"></i>Usuń
+                </button>
+              </div>
             </div>
-            <button onclick="openReceiptFullscreen()"
-              class="mt-2 text-xs text-primary hover:underline w-full text-center">
-              <i class="fas fa-expand-alt mr-1"></i>Powiększ zdjęcie
-            </button>
+            <div id="modal-receipt-empty">
+              <button onclick="document.getElementById('modal-receipt-file-input').click()"
+                class="w-full border-2 border-dashed border-gray-300 rounded-lg py-4 text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors">
+                <i class="fas fa-camera mr-1"></i>Dodaj zdjęcie paragonu
+              </button>
+            </div>
+            <input type="file" id="modal-receipt-file-input" accept="image/*" class="hidden" onchange="uploadExpenseReceipt(this)" />
           </div>
         </div>
         <div class="px-4 py-3 border-t flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">

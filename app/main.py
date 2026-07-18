@@ -72,8 +72,7 @@ async def favicon():
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "enable_payment_cards": settings.enable_payment_cards,
         "enable_assets": settings.enable_assets,
         "app_version": APP_VERSION,

@@ -512,9 +512,10 @@ async function openExpenseModal(expenseId) {
 
     // Receipt image
     if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
-    const receiptSection = document.getElementById("modal-receipt-section");
-    receiptSection.classList.add("hidden");
+    document.getElementById("modal-receipt-section").classList.add("hidden");
+    document.getElementById("modal-receipt-empty").classList.remove("hidden");
     document.getElementById("modal-receipt-img").src = "";
+    document.getElementById("modal-receipt-file-input").value = "";
     if (expense.receipt_image_path) {
         loadReceiptImage(expenseId);
     }
@@ -551,7 +552,60 @@ async function loadReceiptImage(expenseId) {
         const img = document.getElementById("modal-receipt-img");
         img.src = currentReceiptBlobUrl;
         document.getElementById("modal-receipt-section").classList.remove("hidden");
+        document.getElementById("modal-receipt-empty").classList.add("hidden");
     } catch (_) {}
+}
+
+async function uploadExpenseReceipt(input) {
+    const file = input.files[0];
+    if (!file || !currentEditingExpenseId) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch(`${API_URL}/receipts/${currentEditingExpenseId}/receipt`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: formData,
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: "Błąd serwera" }));
+            throw new Error(err.detail || "Błąd serwera");
+        }
+        const expense = currentExpenses.find((e) => e.id === currentEditingExpenseId);
+        if (expense) {
+            expense.receipt_image_path = "uploaded";
+            renderExpenses(currentExpenses);
+        }
+        await loadReceiptImage(currentEditingExpenseId);
+        showToast("Zdjęcie paragonu zostało zapisane", "success");
+    } catch (e) {
+        showToast(e.message, "error");
+    } finally {
+        input.value = "";
+    }
+}
+
+async function removeExpenseReceipt() {
+    if (!currentEditingExpenseId) return;
+    if (!confirm("Usunąć zdjęcie paragonu?")) return;
+
+    try {
+        await apiRequest("DELETE", `/receipts/${currentEditingExpenseId}/receipt`);
+        const expense = currentExpenses.find((e) => e.id === currentEditingExpenseId);
+        if (expense) {
+            expense.receipt_image_path = null;
+            renderExpenses(currentExpenses);
+        }
+        if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
+        document.getElementById("modal-receipt-img").src = "";
+        document.getElementById("modal-receipt-section").classList.add("hidden");
+        document.getElementById("modal-receipt-empty").classList.remove("hidden");
+        showToast("Zdjęcie paragonu zostało usunięte", "success");
+    } catch (e) {
+        showToast(e.message, "error");
+    }
 }
 
 function openReceiptFullscreen() {

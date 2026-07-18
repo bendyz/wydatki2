@@ -6,12 +6,12 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class PasswordChangeRequest(BaseModel):
     old_password: str
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6, max_length=72)
 
 
 class SetPasswordRequest(BaseModel):
     temp_token: str
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6, max_length=72)
 
 
 class UserBase(BaseModel):
@@ -25,7 +25,7 @@ class UserCreate(UserBase):
     """Schemat do tworzenia nowego użytkownika (rejestracja)"""
 
     password: str = Field(
-        ..., min_length=6, description="Hasło użytkownika (min. 6 znaków)"
+        ..., min_length=6, max_length=72, description="Hasło użytkownika (min. 6 znaków)"
     )
 
 
