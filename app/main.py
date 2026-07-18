@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from fastapi.templating import Jinja2Templates
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import init_db
+
+# Konfiguracja logowania — w trybie debug loguj na poziomie INFO
+# (m.in. pełna komunikacja z OpenRouter w app.services.ai_service)
+logging.basicConfig(
+    level=logging.INFO if settings.debug else logging.WARNING,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 
 @asynccontextmanager

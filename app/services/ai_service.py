@@ -1,5 +1,7 @@
 import base64
+import copy
 import json
+import logging
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -9,6 +11,26 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _redact_payload_for_log(payload: dict) -> dict:
+    """Skraca base64 obrazów w payloadzie, żeby log był czytelny."""
+    safe = copy.deepcopy(payload)
+    for msg in safe.get("messages", []):
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            url = part.get("image_url", {}).get("url", "") if isinstance(
+                part.get("image_url"), dict
+            ) else ""
+            if isinstance(url, str) and url.startswith("data:"):
+                part["image_url"]["url"] = f"<data-uri {len(url)} znaków>"
+    return safe
 from app.crud.card import get_cards
 from app.crud.category import get_categories
 from app.crud.expense import get_expenses
@@ -159,6 +181,14 @@ async def _call_openrouter(
         ),
     }
 
+    if settings.debug:
+        logger.info(
+            "→ OpenRouter request:\n%s",
+            json.dumps(
+                _redact_payload_for_log(payload), ensure_ascii=False, indent=2
+            ),
+        )
+
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -173,6 +203,13 @@ async def _call_openrouter(
         )
     except httpx.RequestError as e:
         raise ValueError(f"Nie udało się połączyć z OpenRouter: {e}")
+
+    if settings.debug:
+        logger.info(
+            "← OpenRouter response [%s]:\n%s",
+            response.status_code,
+            response.text,
+        )
 
     if response.status_code >= 400:
         raise ValueError(_openrouter_error_message(response))
