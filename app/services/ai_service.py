@@ -159,15 +159,66 @@ async def _call_openrouter(
         ),
     }
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+    except httpx.TimeoutException:
+        raise ValueError(
+            "Przekroczono limit czasu (120s) oczekiwania na odpowiedź OpenRouter. "
+            "Spróbuj ponownie."
         )
-        response.raise_for_status()
-        data = response.json()
+    except httpx.RequestError as e:
+        raise ValueError(f"Nie udało się połączyć z OpenRouter: {e}")
+
+    if response.status_code >= 400:
+        raise ValueError(_openrouter_error_message(response))
+
+    data = response.json()
+    try:
         return data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise ValueError(
+            f"OpenRouter zwrócił odpowiedź w nieoczekiwanym formacie: {data}"
+        )
+
+
+def _openrouter_error_message(response: httpx.Response) -> str:
+    """Buduje czytelny komunikat błędu z odpowiedzi OpenRouter."""
+    status_code = response.status_code
+    detail = None
+    try:
+        body = response.json()
+        err = body.get("error") if isinstance(body, dict) else None
+        if isinstance(err, dict):
+            detail = err.get("message")
+        elif isinstance(err, str):
+            detail = err
+        if not detail and isinstance(body, dict):
+            detail = body.get("message")
+    except Exception:
+        detail = (response.text or "").strip() or None
+
+    # Podpowiedzi dla najczęstszych kodów
+    hints = {
+        401: "Nieprawidłowy lub brakujący klucz API OpenRouter.",
+        402: "Brak środków na koncie OpenRouter.",
+        403: "Brak dostępu do wybranego modelu (sprawdź uprawnienia / moderację).",
+        429: "Przekroczono limit zapytań OpenRouter (rate limit). Spróbuj za chwilę.",
+        502: "OpenRouter/model chwilowo niedostępny. Spróbuj ponownie.",
+        503: "OpenRouter/model chwilowo niedostępny. Spróbuj ponownie.",
+    }
+    hint = hints.get(status_code)
+
+    parts = [f"OpenRouter zwrócił błąd {status_code}"]
+    if detail:
+        parts.append(f"— {detail}")
+    if hint:
+        parts.append(f"({hint})")
+    return " ".join(parts)
 
 
 def _parse_ai_json_response(raw_text: str) -> dict:

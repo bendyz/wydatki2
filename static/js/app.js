@@ -219,7 +219,10 @@ async function dashboardReceiptSelected(file) {
             headers: { Authorization: `Bearer ${getToken()}` },
             body: formData,
         });
-        if (!response.ok) throw new Error("Błąd analizy AI");
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: "Błąd analizy AI" }));
+            throw new Error(err.detail || "Błąd analizy AI");
+        }
         const draft = await response.json();
         showDraft(draft);
     } catch (e) {
@@ -788,7 +791,10 @@ async function analyzeReceipt() {
             headers: { Authorization: `Bearer ${getToken()}` },
             body: formData,
         });
-        if (!response.ok) throw new Error("Błąd analizy AI");
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: "Błąd analizy AI" }));
+            throw new Error(err.detail || "Błąd analizy AI");
+        }
         const draft = await response.json();
         showDraft(draft);
     } catch (e) {
