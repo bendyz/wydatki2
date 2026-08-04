@@ -140,22 +140,26 @@
               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary" />
             <button type="button" onclick="toggleApiKeyVisibility()"
               class="mt-1 text-xs text-primary hover:underline">Pokaż / ukryj klucz</button>
+            <p class="mt-2 text-xs text-gray-500">Klucz z <span class="font-mono">openrouter.ai</span> — używany do analizy paragonów i opisów tekstowych. Bez niego funkcje AI nie działają.</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
             <input type="text" id="cfg-openrouter-model" placeholder="np. google/gemini-3-flash-preview"
               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary" />
+            <p class="mt-2 text-xs text-gray-500">Identyfikator modelu OpenRouter w formacie <span class="font-mono">dostawca/model</span>. Musi obsługiwać obraz (vision), żeby czytać paragony — np. <span class="font-mono">google/gemini-3-flash-preview</span>.</p>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Maks. tokenów</label>
-              <input type="number" id="cfg-openrouter-max-tokens" min="256" max="32768"
+              <input type="number" id="cfg-openrouter-max-tokens" min="1000" max="32768"
                 class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <p class="mt-2 text-xs text-gray-500">Górny limit długości odpowiedzi AI. Zalecane <strong>~10000</strong>. Modele „reasoning" (np. gemini flash) zużywają część limitu na myślenie — za niska wartość (np. 256) ucina odpowiedź w połowie i analiza się nie udaje.</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura (0.0–1.0)</label>
               <input type="number" id="cfg-openrouter-temperature" min="0" max="1" step="0.05"
                 class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <p class="mt-2 text-xs text-gray-500">Losowość odpowiedzi. Dla ekstrakcji danych z paragonu trzymaj nisko (<strong>0.0–0.2</strong>) — daje stabilne, powtarzalne wyniki.</p>
             </div>
           </div>
         </div>
@@ -172,6 +176,7 @@
         <textarea id="cfg-personal-context" rows="6"
           placeholder="Julka to mój samochód osobowy marki Alfa Romeo..."
           class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-y"></textarea>
+        <p class="mt-2 text-xs text-gray-500">Fakty o Tobie dołączane do każdego zapytania AI — pomagają trafniej kategoryzować wydatki (np. nazwy samochodów, miasto, nazwy kart). Jedna informacja na linię.</p>
       </div>
 
       <!-- Wykrywanie duplikatów -->
@@ -179,6 +184,7 @@
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-copy text-primary mr-2"></i> Wykrywanie duplikatów
         </h2>
+        <p class="mb-4 text-xs text-gray-500">Przy dodawaniu wydatku przez AI aplikacja ostrzega o możliwym duplikacie, jeśli istnieje już wydatek w podanym zasięgu dni i o kwocie różniącej się mniej niż podany próg.</p>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Zasięg dat (dni)</label>
