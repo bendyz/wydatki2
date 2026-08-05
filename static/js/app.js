@@ -5,6 +5,20 @@ let currentDraft = null;
 let currentReceiptFile = null;
 let categoriesCache = [];
 let cardsCache = [];
+
+// Specjalna wartość opcji "dodaj nową kategorię" w selectach draftu
+const NEW_CATEGORY_OPTION = "__new__";
+let pendingCategorySelect = null; // select, który wywołał formularz nowej kategorii
+
+// Zwraca HTML opcji <option> dla selecta kategorii (z opcją "dodaj nową" na końcu)
+function categoryOptionsHtml(selectedId = null, { includeEmpty = false } = {}) {
+    const empty = includeEmpty ? '<option value="">-- wybierz --</option>' : "";
+    const opts = categoriesCache
+        .map((c) => `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+        .join("");
+    const addOpt = `<option value="${NEW_CATEGORY_OPTION}">➕ Dodaj nową kategorię…</option>`;
+    return empty + opts + addOpt;
+}
 let currentEditingExpenseId = null;
 let currentExpenses = [];
 let currentExpensesOffset = 0;
@@ -839,7 +853,7 @@ function showDraft(draft) {
         dupDiv.classList.add("hidden");
     }
 
-    loadCategoriesSelect("draft-category", draft.category_id);
+    loadCategoriesSelect("draft-category", draft.category_id, true);
     loadCardsSelect("draft-card", draft.card_id);
 
     const itemsDiv = document.getElementById("draft-items-list");
@@ -851,8 +865,8 @@ function showDraft(draft) {
                 <div class="flex gap-2 w-full sm:w-auto">
                     <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" value="${item.price}" id="draft-item-${i}-price">
                     <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="${item.quantity}" id="draft-item-${i}-qty">
-                    <select class="w-32 border rounded px-2 py-1 text-sm" id="draft-item-${i}-cat">
-                        ${categoriesCache.map((c) => `<option value="${c.id}" ${c.id === item.category_id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+                    <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="draft-item-${i}-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
+                        ${categoryOptionsHtml(item.category_id)}
                     </select>
                     <button onclick="this.parentElement.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
                 </div>
@@ -895,8 +909,8 @@ function addDraftItem() {
         <div class="flex gap-2 w-full sm:w-auto">
             <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" placeholder="Cena">
             <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="1">
-            <select class="w-32 border rounded px-2 py-1 text-sm">
-                ${categoriesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+            <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
+                ${categoryOptionsHtml()}
             </select>
             <button onclick="this.parentElement.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
         </div>
@@ -988,16 +1002,71 @@ async function loadCategories() {
     }
 }
 
-async function loadCategoriesSelect(selectId = "manual-category", selectedId = null) {
+async function loadCategoriesSelect(selectId = "manual-category", selectedId = null, withAddNew = false) {
     try {
         const cats = await apiRequest("GET", "/categories/?include_global=true");
         categoriesCache = cats;
         const select = document.getElementById(selectId);
         if (!select) return;
+        const addOpt = withAddNew ? `<option value="${NEW_CATEGORY_OPTION}">➕ Dodaj nową kategorię…</option>` : "";
         select.innerHTML = '<option value="">-- wybierz --</option>' +
-            cats.map((c) => `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+            cats.map((c) => `<option value="${c.id}" ${c.id == selectedId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("") +
+            addOpt;
     } catch (e) {
         showToast("Błąd ładowania kategorii: " + e.message, "error");
+    }
+}
+
+// Obsługa wyboru "➕ Dodaj nową kategorię…" w selektach draftu
+function handleCategorySelectChange(selectEl) {
+    if (selectEl.value !== NEW_CATEGORY_OPTION) {
+        selectEl.dataset.prev = selectEl.value;
+        return;
+    }
+    // przywróć poprzedni wybór i otwórz formularz
+    selectEl.value = selectEl.dataset.prev || "";
+    pendingCategorySelect = selectEl;
+    const input = document.getElementById("new-cat-inline-input");
+    input.value = "";
+    document.getElementById("new-cat-inline-modal").classList.remove("hidden");
+    setTimeout(() => input.focus(), 50);
+}
+
+function closeInlineCategoryForm() {
+    pendingCategorySelect = null;
+    document.getElementById("new-cat-inline-modal").classList.add("hidden");
+}
+
+// Przerysowuje wszystkie selecty kategorii w draftcie zachowując bieżący wybór
+function refreshDraftCategorySelects() {
+    document.querySelectorAll(".js-category-select").forEach((sel) => {
+        const cur = sel.value;
+        const includeEmpty = sel.dataset.emptyOption === "true";
+        sel.innerHTML = categoryOptionsHtml(cur, { includeEmpty });
+        sel.value = cur;
+    });
+}
+
+async function submitInlineCategory() {
+    const input = document.getElementById("new-cat-inline-input");
+    const name = input.value.trim();
+    if (!name) {
+        input.focus();
+        return;
+    }
+    try {
+        const created = await apiRequest("POST", "/categories/", { name });
+        // dopisz do cache (jeśli jeszcze nie ma)
+        if (!categoriesCache.some((c) => c.id === created.id)) {
+            categoriesCache.push(created);
+        }
+        const target = pendingCategorySelect;
+        refreshDraftCategorySelects();
+        if (target) target.value = created.id;
+        closeInlineCategoryForm();
+        showToast("Kategoria dodana!", "success");
+    } catch (e) {
+        showToast(e.message, "error");
     }
 }
 

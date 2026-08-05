@@ -43,8 +43,8 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Kategoria</label>
-            <select id="draft-category"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <select id="draft-category" class="js-category-select w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              data-empty-option="true" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
               <option value="">-- wybierz --</option>
             </select>
           </div>
@@ -98,6 +98,31 @@
             Odrzuć
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mini-modal: dodawanie nowej kategorii z poziomu draftu -->
+<div id="new-cat-inline-modal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeInlineCategoryForm()"></div>
+  <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+    <div class="relative w-full max-w-xs bg-white rounded-xl shadow-2xl p-4">
+      <h3 class="text-sm font-bold text-gray-900 mb-3">
+        <i class="fas fa-plus text-primary mr-1"></i> Nowa kategoria
+      </h3>
+      <input type="text" id="new-cat-inline-input" placeholder="Nazwa kategorii"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();submitInlineCategory();} else if(event.key==='Escape'){closeInlineCategoryForm();}" />
+      <div class="flex gap-2 mt-4">
+        <button onclick="submitInlineCategory()"
+          class="flex-1 bg-primary text-white py-2 px-3 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+          Dodaj
+        </button>
+        <button onclick="closeInlineCategoryForm()"
+          class="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
+          Anuluj
+        </button>
       </div>
     </div>
   </div>
