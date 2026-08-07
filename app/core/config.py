@@ -31,6 +31,10 @@ class DuplicatesConfig(BaseModel):
     amount_threshold: float = 0.5
 
 
+# Znany, niebezpieczny domyślny sekret — nie wolno go używać w produkcji.
+DEV_SECRET_KEY = "dev-secret-key-change-in-production"
+
+
 class Settings(BaseModel):
     """Konfiguracja aplikacji ładowana z YAML z możliwością nadpisania przez zmienne środowiskowe."""
 
@@ -39,7 +43,7 @@ class Settings(BaseModel):
     registration_enabled: bool = True
 
     # JWT Security
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = DEV_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 godziny
 
@@ -60,13 +64,14 @@ class Settings(BaseModel):
     @classmethod
     def from_yaml(cls, yaml_path: str = "data/config/config.yaml") -> "Settings":
         path = Path(yaml_path)
-        if not path.exists():
-            return cls()
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        else:
+            data = {}
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-
-        # Nadpisania ze zmiennych środowiskowych (priorytet nad YAML)
+        # Nadpisania ze zmiennych środowiskowych (priorytet nad YAML) —
+        # stosowane także gdy plik YAML nie istnieje.
         env_api_key = os.getenv("OPENROUTER_API_KEY")
         if env_api_key:
             data.setdefault("openrouter", {})["api_key"] = env_api_key
@@ -78,6 +83,10 @@ class Settings(BaseModel):
         env_port = os.getenv("PORT")
         if env_port:
             data.setdefault("server", {})["port"] = int(env_port)
+
+        env_secret = os.getenv("SECRET_KEY")
+        if env_secret:
+            data["SECRET_KEY"] = env_secret
 
         return cls(**data)
 
@@ -113,3 +122,12 @@ class Settings(BaseModel):
 
 
 settings = Settings.from_yaml()
+
+# Zabezpieczenie: w trybie produkcyjnym (debug=False) nie pozwól wystartować
+# ze znanym, domyślnym sekretem — inaczej każdy mógłby podrobić dowolny token JWT.
+if not settings.debug and settings.SECRET_KEY == DEV_SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY ma domyślną, niebezpieczną wartość. Ustaw własny SECRET_KEY "
+        "w data/config/config.yaml lub przez zmienną środowiskową SECRET_KEY "
+        "przed uruchomieniem w trybie produkcyjnym (debug=False)."
+    )

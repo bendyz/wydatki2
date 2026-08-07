@@ -80,20 +80,23 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Jeśli admin wymusił reset hasła — pomiń weryfikację i zwróć temp token
-    if user.force_password_reset:
-        temp_token = create_access_token(
-            data={"sub": str(user.id), "password_reset": True},
-            expires_delta=timedelta(minutes=15),
-        )
-        return {"password_reset_required": True, "temp_token": temp_token}
-
+    # Najpierw zweryfikuj hasło — inaczej ktoś znający tylko email użytkownika
+    # oznaczonego do resetu mógłby przejąć konto przez token resetu.
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nieprawidłowy email lub hasło",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Jeśli admin wymusił reset hasła — po poprawnym zalogowaniu zwróć temp token
+    # zamiast normalnego, aby wymusić ustawienie nowego hasła.
+    if user.force_password_reset:
+        temp_token = create_access_token(
+            data={"sub": str(user.id), "password_reset": True},
+            expires_delta=timedelta(minutes=15),
+        )
+        return {"password_reset_required": True, "temp_token": temp_token}
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(

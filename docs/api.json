@@ -3,7 +3,7 @@
   "info": {
     "title": "Wydatki 2.0",
     "description": "Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    "version": "0.4.1"
+    "version": "0.4.6"
   },
   "paths": {
     "/api/v1/auth/registration-status": {

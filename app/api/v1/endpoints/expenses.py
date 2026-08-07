@@ -13,10 +13,45 @@ from app.crud.expense import (
     update_expense,
 )
 from app.db.session import get_db
-from app.models.models import User
+from app.models.models import Category, PaymentCard, User
 from app.schemas.expense import ExpenseCreate, ExpenseResponse, ExpenseUpdate
 
 router = APIRouter()
+
+
+def _assert_category_allowed(db: Session, user_id: int, category_id: Optional[int]) -> None:
+    """Kategoria musi należeć do użytkownika lub być globalna (user_id IS NULL)."""
+    if category_id is None:
+        return
+    cat = db.query(Category).filter(Category.id == category_id).first()
+    if cat is None or (cat.user_id is not None and cat.user_id != user_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Nieprawidłowa kategoria: {category_id}",
+        )
+
+
+def _assert_card_allowed(db: Session, user_id: int, card_id: Optional[int]) -> None:
+    """Karta płatnicza musi należeć do użytkownika."""
+    if card_id is None:
+        return
+    card = (
+        db.query(PaymentCard)
+        .filter(PaymentCard.id == card_id, PaymentCard.user_id == user_id)
+        .first()
+    )
+    if card is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Nieprawidłowa karta płatnicza: {card_id}",
+        )
+
+
+def _validate_expense_refs(db: Session, user_id: int, category_id, card_id, items) -> None:
+    _assert_category_allowed(db, user_id, category_id)
+    _assert_card_allowed(db, user_id, card_id)
+    for item in items or []:
+        _assert_category_allowed(db, user_id, item.get("category_id"))
 
 
 @router.post(
@@ -34,6 +69,8 @@ def create_new_expense(
     Tworzy nowy wydatek wraz z pozycjami (items).
     Każda pozycja może mieć własną kategorię (category_id).
     """
+    items = [item.model_dump() for item in expense.items]
+    _validate_expense_refs(db, current_user.id, expense.category_id, expense.card_id, items)
     db_expense = create_expense(
         db=db,
         user_id=current_user.id,
@@ -42,7 +79,7 @@ def create_new_expense(
         expense_date=expense.date,
         category_id=expense.category_id,
         card_id=expense.card_id,
-        items=[item.model_dump() for item in expense.items],
+        items=items,
     )
     return db_expense
 
@@ -120,6 +157,14 @@ def update_existing_expense(
 
     items = update_data.pop("items", None)
     items_list = items if items is not None else None
+
+    _validate_expense_refs(
+        db,
+        current_user.id,
+        update_data.get("category_id"),
+        update_data.get("card_id"),
+        items_list,
+    )
 
     updated = update_expense(
         db,
