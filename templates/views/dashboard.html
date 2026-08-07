@@ -139,7 +139,8 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Kategoria</label>
-            <select id="modal-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <select id="modal-category" class="js-category-select w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              data-empty-option="true" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
               <option value="">-- wybierz --</option>
             </select>
           </div>

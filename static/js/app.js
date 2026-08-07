@@ -497,7 +497,7 @@ async function openExpenseModal(expenseId) {
     document.getElementById("modal-amount").value = expense.amount;
     document.getElementById("modal-date").value = expense.date;
     document.getElementById("modal-description").value = expense.description || "";
-    loadCategoriesSelect("modal-category", expense.category_id);
+    loadCategoriesSelect("modal-category", expense.category_id, true);
     loadCardsSelect("modal-card", expense.card_id);
 
     const itemsList = document.getElementById("modal-items-list");
@@ -508,8 +508,8 @@ async function openExpenseModal(expenseId) {
                 <div class="flex gap-2 w-full sm:w-auto">
                     <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" value="${item.price}" id="modal-item-${i}-price">
                     <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="${item.quantity}" id="modal-item-${i}-qty">
-                    <select class="w-32 border rounded px-2 py-1 text-sm" id="modal-item-${i}-cat">
-                        ${categoriesCache.map((c) => `<option value="${c.id}" ${c.id === item.category_id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+                    <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="modal-item-${i}-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
+                        ${categoryOptionsHtml(item.category_id)}
                     </select>
                     <button onclick="this.parentElement.parentElement.remove(); updateModalItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
                 </div>
@@ -654,8 +654,8 @@ function addModalItem() {
         <div class="flex gap-2 w-full sm:w-auto">
             <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" placeholder="Cena" id="modal-item-new-price">
             <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="1" id="modal-item-new-qty">
-            <select class="w-32 border rounded px-2 py-1 text-sm" id="modal-item-new-cat">
-                ${categoriesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+            <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="modal-item-new-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
+                ${categoryOptionsHtml()}
             </select>
             <button onclick="this.parentElement.parentElement.remove(); updateModalItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
         </div>
@@ -1037,8 +1037,8 @@ function closeInlineCategoryForm() {
     document.getElementById("new-cat-inline-modal").classList.add("hidden");
 }
 
-// Przerysowuje wszystkie selecty kategorii w draftcie zachowując bieżący wybór
-function refreshDraftCategorySelects() {
+// Przerysowuje wszystkie selecty kategorii (draft + edycja) zachowując bieżący wybór
+function refreshCategorySelects() {
     document.querySelectorAll(".js-category-select").forEach((sel) => {
         const cur = sel.value;
         const includeEmpty = sel.dataset.emptyOption === "true";
@@ -1061,7 +1061,7 @@ async function submitInlineCategory() {
             categoriesCache.push(created);
         }
         const target = pendingCategorySelect;
-        refreshDraftCategorySelects();
+        refreshCategorySelects();
         if (target) target.value = created.id;
         closeInlineCategoryForm();
         showToast("Kategoria dodana!", "success");
