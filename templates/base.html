@@ -5,12 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Wydatki 2.0 - AI Expense Manager{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <!-- Wybór motywu MUSI być ustawiony przed pierwszym paintem, inaczej przy
+         jasnym motywie mignie ciemne tło (i odwrotnie). Stąd blokujący skrypt
+         inline, a nie logika w app.js. -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem("theme");
+                if (t !== "light" && t !== "dark") {
+                    t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+                }
+                document.documentElement.setAttribute("data-theme", t);
+            } catch (e) {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        })();
+    </script>
     <!-- Krytyczny CSS PRZED skryptem CDN. Tailwind Play kompiluje asynchronicznie,
-         więc pierwszy paint leci bez żadnych stylów — bez tego bloku widać biały
-         błysk i wszystkie widoki SPA naraz. -->
+         więc pierwszy paint leci bez żadnych stylów — bez tego bloku widać błysk
+         i wszystkie widoki SPA naraz. -->
     <style>
         html { background: #0b1120; color-scheme: dark; }
-        body { margin: 0; background: #0b1120; color: #e8edf7; }
+        html[data-theme="light"] { background: #f8fafc; color-scheme: light; }
+        body { margin: 0; background: inherit; color: #e8edf7; }
+        html[data-theme="light"] body { color: #0f172a; }
         .view { display: none !important; }
         .view.active { display: block !important; }
         #view-login.active { display: flex !important; }
@@ -19,22 +37,33 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
-        // Motyw ciemny realizowany przez PRZEMAPOWANIE palety Tailwinda, nie przez
-        // przepisywanie klas w szablonach. Szczegóły i konwencje: CLAUDE.md.
+        // Motyw realizowany przez PRZEMAPOWANIE palety Tailwinda na zmienne CSS,
+        // nie przez przepisywanie klas w szablonach ani warianty `dark:`.
+        // Wartości obu motywów siedzą w static/css/app.css. Konwencje: CLAUDE.md.
         const rgb = (v) => `rgb(var(${v}) / <alpha-value>)`;
+        // Rozwija 4 role barwy (bg / bg2 / fg / fg2) na pełną skalę odcieni,
+        // żeby istniejące klasy typu bg-blue-100 czy text-red-700 dalej działały.
+        const tint = (h) => ({
+            50: rgb(`--t-${h}-bg`), 100: rgb(`--t-${h}-bg`),
+            200: rgb(`--t-${h}-bg2`), 300: rgb(`--t-${h}-bg2`),
+            400: rgb(`--t-${h}-fg`), 500: rgb(`--t-${h}-fg`), 600: rgb(`--t-${h}-fg`),
+            700: rgb(`--t-${h}-fg2`), 800: rgb(`--t-${h}-fg2`), 900: rgb(`--t-${h}-fg2`),
+        });
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        // ⚠️ RAMPA `gray` JEST ODWRÓCONA: 50 = najciemniejszy, 900 = najjaśniejszy.
-                        // Dzięki temu istniejące klasy działają na ciemnym tle bez zmian:
-                        // text-gray-900 (nagłówek) → jasny, text-gray-500 (etykieta) → średni,
-                        // bg-gray-50 (tło strony / thead) → ciemny, border-gray-300 → ciemny.
-                        // Nie „naprawiaj" tego, pisząc odwrotnie — trzymaj się konwencji z reszty kodu.
+                        // ⚠️ Odcienie `gray` znaczą ROLE, nie jasność: 50 = tło strony,
+                        // 200/300 = obramowania, 500/600 = etykiety, 900 = nagłówki.
+                        // W motywie ciemnym rampa jest ODWRÓCONA (50 = najciemniejszy),
+                        // w jasnym idzie normalnie — role zostają te same, więc szablony
+                        // działają w obu bez zmian. Nie „naprawiaj" tego, pisząc odwrotnie;
+                        // trzymaj się konwencji z reszty kodu.
                         gray: {
-                            50: "#0f1626", 100: "#1a2235", 200: "#253049", 300: "#33405c",
-                            400: "#6b7a96", 500: "#9aa8c2", 600: "#aab6cd", 700: "#c9d3e5",
-                            800: "#dde4f0", 900: "#e8edf7", 950: "#f5f8ff",
+                            50: rgb("--g-50"), 100: rgb("--g-100"), 200: rgb("--g-200"),
+                            300: rgb("--g-300"), 400: rgb("--g-400"), 500: rgb("--g-500"),
+                            600: rgb("--g-600"), 700: rgb("--g-700"), 800: rgb("--g-800"),
+                            900: rgb("--g-900"), 950: rgb("--g-950"),
                         },
 
                         // Powierzchnie. `white` celowo NIE jest przemapowany — text-white (31×)
@@ -62,54 +91,34 @@
                             solid: rgb("--c-danger-solid"),
                         },
                         warning: rgb("--c-warning"),
-                        secondary: "#9aa8c2",
+                        secondary: rgb("--c-text-muted"),
 
-                        // Skale barwne: odcienie -50/-100/-200 pełnią wyłącznie rolę TŁA chipów
-                        // (→ ciemne tinty), odcienie -400..-900 wyłącznie rolę TEKSTU (→ neony).
-                        blue: {
-                            50: "#131e3a", 100: "#16294d", 200: "#1d3663", 300: "#2a4a85",
-                            400: "#60a5fa", 500: "#7c8aff", 600: "#93b4ff", 700: "#a5c4ff",
-                            800: "#c2d8ff", 900: "#dce8ff",
-                        },
-                        green: {
-                            50: "#0b2620", 100: "#0f2f28", 200: "#154237", 300: "#1d5c4b",
-                            400: "#34d399", 500: "#10b981", 600: "#4ade80", 700: "#6ee7b7",
-                            800: "#a7f3d0", 900: "#d1fae5",
-                        },
-                        red: {
-                            50: "#2a1220", 100: "#3a1526", 200: "#4d1c31", 300: "#6b2440",
-                            400: "#fb7185", 500: "#f43f5e", 600: "#fda4af", 700: "#fda4af",
-                            800: "#fecdd3", 900: "#ffe4e6",
-                        },
-                        yellow: {
-                            50: "#2b210a", 100: "#3a2c0d", 200: "#4a3a12", 300: "#5e4a17",
-                            400: "#fbbf24", 500: "#f59e0b", 600: "#fcd34d", 700: "#fcd34d",
-                            800: "#fde68a", 900: "#fef3c7",
-                        },
-                        indigo: {
-                            50: "#1a1b3d", 100: "#20224a", 200: "#2a2d5e",
-                            400: "#a5b4fc", 500: "#8b93fb", 600: "#a5b4fc", 700: "#c7d2fe",
-                        },
-                        purple: {
-                            50: "#211a3d", 100: "#2a2150", 400: "#c4b5fd", 500: "#a78bfa",
-                            600: "#c4b5fd", 700: "#ddd6fe",
-                        },
+                        // Skale barwne — po 4 role na barwę, zamiast 10 osobnych odcieni:
+                        //   50/100 = tło chipa, 200/300 = jego hover,
+                        //   400/500/600 = tekst, 700/800/900 = tekst mocny.
+                        // W ciemnym tła są przygaszone a teksty neonowe; w jasnym odwrotnie.
+                        blue: tint("blue"),
+                        green: tint("green"),
+                        red: tint("red"),
+                        yellow: tint("yellow"),
+                        indigo: tint("indigo"),
+                        purple: tint("purple"),
                     },
 
                     // Domyślnie #fff → biała aureola wokół focusa na ciemnym tle.
-                    ringOffsetColor: { DEFAULT: "#0b1120" },
+                    ringOffsetColor: { DEFAULT: rgb("--c-bg") },
 
-                    // Domyślne cienie Tailwinda (czerń przy alpha 0.05–0.1) są na #0b1120
-                    // niewidoczne i wszystkie karty tracą uniesienie. Mocniejsza czerń
-                    // + wewnętrzny highlight u góry dają czytelną głębię.
+                    // Wartości per motyw w app.css: na ciemnym mocna czerń + wewnętrzny
+                    // highlight (domyślne cienie Tailwinda są tam niewidoczne),
+                    // na jasnym subtelne cienie jak w stocku.
                     boxShadow: {
-                        sm: "0 1px 2px 0 rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04)",
-                        DEFAULT: "0 2px 6px -1px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.05)",
-                        md: "0 6px 14px -3px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05)",
-                        lg: "0 12px 24px -6px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.06)",
-                        xl: "0 20px 40px -10px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.06)",
-                        "2xl": "0 32px 64px -16px rgb(0 0 0 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.07)",
-                        // Neonowa poświata — przycisk primary, aktywna pozycja nawigacji.
+                        sm: "var(--shadow-sm)",
+                        DEFAULT: "var(--shadow)",
+                        md: "var(--shadow-md)",
+                        lg: "var(--shadow-lg)",
+                        xl: "var(--shadow-xl)",
+                        "2xl": "var(--shadow-2xl)",
+                        // Neonowa poświata — aktywna pozycja nawigacji, akcenty.
                         glow: "0 0 0 1px rgb(var(--c-accent) / 0.35), 0 8px 28px -10px rgb(var(--c-accent) / 0.5)",
                         "glow-primary": "0 8px 24px -10px rgb(var(--c-primary-solid) / 0.9)",
                     },
@@ -160,6 +169,10 @@
                 class="nav-item hidden w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:text-primary hover:bg-surface-2 transition-colors">
                 <i class="fas fa-cog w-4 text-center"></i><span>Admin</span>
             </button>
+            <button onclick="toggleTheme()"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:text-primary hover:bg-surface-2 transition-colors">
+                <i class="fas fa-sun w-4 text-center js-theme-icon"></i><span class="js-theme-label">Jasny motyw</span>
+            </button>
             <button onclick="logout()"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-danger hover:bg-red-50 transition-colors">
                 <i class="fas fa-sign-out-alt w-4 text-center"></i><span>Wyloguj</span>
@@ -198,6 +211,10 @@
                 <button id="nav-admin-btn-mobile" data-view="admin" onclick="showView('admin'); toggleMobileMenu()"
                     class="nav-item hidden flex-col items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium text-gray-700 bg-surface-2 hover:text-primary transition-colors">
                     <i class="fas fa-cog text-lg"></i><span>Admin</span>
+                </button>
+                <button onclick="toggleTheme()"
+                    class="flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium text-gray-700 bg-surface-2 hover:text-primary transition-colors">
+                    <i class="fas fa-sun text-lg js-theme-icon"></i><span class="js-theme-label" data-short>Jasny</span>
                 </button>
             </div>
             <button onclick="logout(); toggleMobileMenu()"

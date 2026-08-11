@@ -34,17 +34,27 @@ There are no tests in this project.
 - **Image processing**: OpenCV (`image_service.py`) converts receipt photos to grayscale + adaptive threshold before sending to AI
 - **Background jobs**: APScheduler (`app/worker/scheduler.py`) runs daily at midnight to generate expenses from due subscriptions
 
-### Styling — IMPORTANT: the `gray` ramp is INVERTED
-The app is dark-only. There is no build step (Tailwind Play CDN), so the theme is
-implemented by **remapping Tailwind's palette** in the inline `tailwind.config` in
-`templates/base.html` — not by rewriting the ~550 color classes across 12 templates
-and 48 `innerHTML` blocks in `app.js`.
+### Styling — IMPORTANT: shade numbers mean ROLES, not lightness
+Dark theme by default, light available via a toggle (persisted in `localStorage`,
+falls back to `prefers-color-scheme`). There is no build step (Tailwind Play CDN),
+so themes are implemented by **remapping Tailwind's palette onto CSS variables** in
+the inline `tailwind.config` in `templates/base.html` — not by rewriting the ~550
+color classes across 12 templates and 48 `innerHTML` blocks in `app.js`, and not
+with `dark:` variants.
 
-**The `gray` scale means the opposite of what you expect: `gray-50` is the darkest,
-`gray-900` the lightest.** This is what makes existing classes correct on dark —
-`text-gray-900` (headings) resolves light, `text-gray-500` (labels) mid, `bg-gray-50`
-(page background, table `thead`) dark. When writing new markup, keep using the same
-semantic conventions as the rest of the codebase and it will work.
+**Shade numbers encode roles, not brightness.** `gray-50` = page background,
+`gray-200/300` = borders, `gray-500/600` = labels, `gray-900` = headings; for tinted
+scales `-50/100` = chip background, `-200/300` = its hover, `-400..600` = text,
+`-700..900` = strong text. In dark the `gray` ramp is **inverted** (`gray-50` is the
+darkest); in light it runs normally. Because the roles hold in both, the same markup
+works in either theme. Write new markup following the conventions already in the
+codebase and it will theme itself.
+
+Theme values live in `static/css/app.css` under `:root` (dark) and
+`:root[data-theme="light"]`. The attribute is set by a **blocking inline script in
+`<head>` before first paint** — theme logic must not move into `app.js` or you get a
+flash of the wrong theme. Charts draw to canvas and don't react to CSS variables, so
+`applyTheme()` re-runs `applyChartTheme()` and re-renders the chart-bearing view.
 
 Other conventions that follow from this:
 - `bg-white` is not used — cards use `bg-surface` (`white` stays real white because
@@ -53,10 +63,13 @@ Other conventions that follow from this:
   text); `text-primary` / `text-success` are the bright variants for text and icons.
 - Modal backdrops use `bg-scrim`, never `bg-gray-500`/`bg-gray-900`.
 - Hover on rows and ghost buttons goes *lighter*: `hover:bg-surface-2`.
-- `static/css/app.css` holds `:root` design tokens as **space-separated RGB channels**
+- `static/css/app.css` holds design tokens as **space-separated RGB channels**
   (`--c-surface: 21 28 46`), consumed by the config as `rgb(var(--c-x) / <alpha-value>)`.
-  The Play CDN appends its `<style>` last, so `app.css` can only hold `:root` vars,
+  The Play CDN appends its `<style>` last, so `app.css` can only hold token blocks,
   `@keyframes`, and rules with `!important` or specificity ≥ 0-2-0.
+- Category `color` values are stored in the DB and tuned for dark. `readableColor()`
+  in `app.js` darkens them at render time in light mode — don't bypass it when
+  rendering category dots or chart segments.
 
 ### Configuration
 All settings live in `data/config/config.yaml` (loaded by `app/core/config.py`). Three env vars override YAML: `OPENROUTER_API_KEY`, `DATABASE_URL`, `PORT`. The SQLite database is at `data/db/wydatki.db`. Receipt images are stored under `data/uploads/receipts/<expense_id>/`.

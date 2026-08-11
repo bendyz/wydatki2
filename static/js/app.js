@@ -38,6 +38,61 @@ function applyChartTheme() {
 }
 applyChartTheme();
 
+// ---------- przełącznik jasny / ciemny ----------
+// Atrybut data-theme ustawia blokujący skrypt w base.html (przed pierwszym
+// paintem). Tutaj tylko go zmieniamy i odświeżamy to, co nie reaguje na CSS.
+function getTheme() {
+    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+        localStorage.setItem("theme", theme);
+    } catch (e) {
+        // tryb prywatny — motyw zadziała do końca sesji
+    }
+
+    // Przycisk opisuje DOCELOWY motyw, nie bieżący — inaczej nie wiadomo,
+    // czy etykieta to stan, czy akcja.
+    const goingToLight = theme === "dark";
+    document.querySelectorAll(".js-theme-icon").forEach((i) => {
+        i.classList.toggle("fa-sun", goingToLight);
+        i.classList.toggle("fa-moon", !goingToLight);
+    });
+    document.querySelectorAll(".js-theme-label").forEach((el) => {
+        const short = el.dataset.short !== undefined; // arkusz mobilny ma mniej miejsca
+        el.textContent = goingToLight
+            ? (short ? "Jasny" : "Jasny motyw")
+            : (short ? "Ciemny" : "Ciemny motyw");
+    });
+
+    // Wykresy rysują się na canvasie, więc nie reagują na zmianę zmiennych CSS —
+    // trzeba odświeżyć domyślne i przerysować widok, który je zawiera.
+    applyChartTheme();
+    if (currentView === "stats") loadStats();
+    else if (currentView === "assets") loadAssetsView();
+    else if (currentView === "tags") loadTagsView();
+    else if (currentView === "dashboard") loadExpenses();
+}
+
+function toggleTheme() {
+    applyTheme(getTheme() === "dark" ? "light" : "dark");
+}
+
+// Kolory kategorii są zapisane w bazie i dobrane pod ciemne tło — neonowy cyan
+// ma na bieli ~1.9:1. Na jasnym motywie przyciemniamy je w locie do czytelnego
+// poziomu; w bazie zostaje jedna, wspólna wartość.
+function readableColor(hex) {
+    if (getTheme() !== "light") return hex;
+    const m = /^#([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const scale = (c) => Math.round(c * 0.62);
+    const r = scale((n >> 16) & 255), g = scale((n >> 8) & 255), b = scale(n & 255);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 // ==================== STATE ====================
 const API_URL = "/api/v1";
 const EXPENSES_PER_PAGE = 50;
@@ -58,7 +113,7 @@ function categoryStyle(idOrName) {
         (x) => x.id === idOrName || x.name === idOrName
     );
     return {
-        color: (c && c.color) || "#9aa8c2",
+        color: readableColor((c && c.color) || "#9aa8c2"),
         icon: (c && c.icon) || "fa-tag",
     };
 }
@@ -92,6 +147,7 @@ function categoryOptionsHtml(selectedId = null, { includeEmpty = false } = {}) {
     const addOpt = `<option value="${NEW_CATEGORY_OPTION}">➕ Dodaj nową kategorię…</option>`;
     return empty + opts + addOpt;
 }
+let currentView = null; // aktywny widok — potrzebny do przerysowania wykresów po zmianie motywu
 let currentEditingExpenseId = null;
 let currentExpenses = [];
 let currentExpensesOffset = 0;
@@ -235,6 +291,7 @@ function showView(viewName) {
 
     document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
     target.classList.add("active");
+    currentView = viewName;
 
     // Stan aktywny w nawigacji (sidebar + dolny pasek renderują te same data-view)
     document.querySelectorAll("[data-view]").forEach((b) =>
@@ -1082,7 +1139,7 @@ async function loadCategories() {
                 <td class="px-3 py-2 text-sm text-gray-900" id="cat-name-${c.id}">
                     <span class="inline-flex items-center gap-2">
                         <span class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                            style="background:${escapeHtml(c.color || "#9aa8c2")}1f; color:${escapeHtml(c.color || "#9aa8c2")}">
+                            style="background:${escapeHtml(c.color || "#9aa8c2")}1f; color:${escapeHtml(readableColor(c.color || "#9aa8c2"))}">
                             <i class="fas ${escapeHtml(c.icon || "fa-tag")} text-xs"></i>
                         </span>
                         <span>${escapeHtml(c.name)}</span>
@@ -1776,6 +1833,7 @@ function escapeHtml(text) {
 // ==================== INIT ====================
 async function initApp() {
     setChromeVisible(true);
+    applyTheme(getTheme()); // dociąga ikonę i etykietę do motywu ustawionego przed paintem
     try {
         currentUser = await apiRequest("GET", "/auth/me");
         if (currentUser.is_admin) {

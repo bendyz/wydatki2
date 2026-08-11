@@ -1,20 +1,29 @@
 /* ==========================================================================
-   Wydatki 2.0 — tokeny motywu (ciemny + neon)
+   Wydatki 2.0 — tokeny motywu (ciemny domyślnie + jasny przełącznikiem)
    --------------------------------------------------------------------------
+   JAK TO DZIAŁA
+   Klasy w szablonach kodują ROLE, nie kolory: `text-gray-900` to zawsze
+   „nagłówek", `bg-gray-50` to „tło strony", `blue-100` to „tło chipa",
+   `blue-700` to „tekst chipa". Motyw podstawia pod te role wartości. Dlatego
+   przełączenie na jasny nie wymaga ANI JEDNEJ zmiany w szablonach — wystarczy
+   inny zestaw zmiennych. W ciemnym rampa `gray` jest odwrócona (50 = najciemniejszy),
+   w jasnym wraca do normalnej kolejności; rola każdego odcienia zostaje ta sama.
+
    UWAGA nt. kaskady: Tailwind Play CDN dopisuje swój <style> na koniec <head>
    i odtwarza go, gdy zostanie usunięty. Ten plik NIGDY nie wygra z klasą
    utility przy tej samej specyficzności. Dlatego trzymamy tu wyłącznie:
-     - :root ze zmiennymi (nie kolidują z niczym),
+     - :root / [data-theme] ze zmiennymi (nie kolidują z niczym),
      - color-scheme / accent-color,
      - @keyframes,
      - reguły o specyficzności >= 0-2-0 (np. .nav-item.is-active) lub !important.
    Kolory komponentów definiujemy w tailwind.config w templates/base.html.
 
-   Zmienne trzymają KANAŁY RGB rozdzielone spacją (nie hex!), bo config używa
-   składni rgb(var(--c-x) / <alpha-value>) — inaczej modyfikatory przezroczystości
-   (bg-scrim/70, bg-opacity-75) wygenerowałyby nieprawidłowy kolor.
+   Zmienne kolorów trzymają KANAŁY RGB rozdzielone spacją (nie hex!), bo config
+   używa składni rgb(var(--c-x) / <alpha-value>) — inaczej modyfikatory
+   przezroczystości (bg-scrim/70, bg-opacity-70) dałyby nieprawidłowy kolor.
    ========================================================================== */
 
+/* ===================== MOTYW CIEMNY (domyślny) ===================== */
 :root {
   color-scheme: dark;         /* natywne date/select/checkbox/number/file na ciemno */
   accent-color: #7c8aff;
@@ -26,8 +35,8 @@
   --c-scrim: 3 6 14;                 /* #03060e  backdrop modali */
 
   /* --- akcent główny ---
-     Rozdzielony na dwie role, bo `text-primary` (57 użyć) chce być jasny na
-     ciemnym tle, a `bg-primary` (22 użycia) nosi biały tekst i musi być ciemny. */
+     Rozdzielony na dwie role, bo `text-primary` chce być jasny na ciemnym tle,
+     a `bg-primary-solid` nosi biały tekst i musi być ciemny. */
   --c-primary: 124 138 255;          /* #7c8aff  tekst / ikony / ring / border */
   --c-primary-solid: 79 70 229;      /* #4f46e5  tło przycisku (biały tekst 6.9:1) */
   --c-primary-solid-hover: 99 102 241; /* #6366f1  hover = jaśniej */
@@ -35,18 +44,107 @@
   --c-accent: 34 211 238;            /* #22d3ee  neon cyan — poświaty, highlighty */
 
   /* --- semantyka --- */
-  --c-success: 52 211 153;           /* #34d399 */
-  --c-success-solid: 5 150 105;      /* #059669 */
-  --c-success-solid-hover: 16 185 129; /* #10b981 */
-  --c-danger: 251 113 133;           /* #fb7185 */
-  --c-danger-solid: 225 29 72;       /* #e11d48 */
-  --c-warning: 251 191 36;           /* #fbbf24 */
+  --c-success: 52 211 153;
+  --c-success-solid: 5 150 105;
+  --c-success-solid-hover: 16 185 129;
+  --c-danger: 251 113 133;
+  --c-danger-solid: 225 29 72;
+  --c-warning: 251 191 36;
 
-  /* --- tekst (mirror odwróconej rampy gray z tailwind.config) --- */
-  --c-text: 232 237 247;             /* #e8edf7 */
-  --c-text-muted: 154 168 194;       /* #9aa8c2 */
-  --c-text-dim: 107 122 150;         /* #6b7a96 */
-  --c-border: 37 48 73;              /* #253049 */
+  /* --- tekst i obramowania (mirror rampy gray, do użytku z JS/wykresów) --- */
+  --c-text: 232 237 247;
+  --c-text-muted: 154 168 194;
+  --c-text-dim: 107 122 150;
+  --c-border: 37 48 73;
+
+  /* --- rampa gray: ODWRÓCONA (50 = najciemniejszy, 900 = najjaśniejszy) --- */
+  --g-50: 15 22 38;      --g-100: 26 34 53;     --g-200: 37 48 73;
+  --g-300: 51 64 92;     --g-400: 107 122 150;  --g-500: 154 168 194;
+  --g-600: 170 182 205;  --g-700: 201 211 229;  --g-800: 221 228 240;
+  --g-900: 232 237 247;  --g-950: 245 248 255;
+
+  /* --- skale barwne, po 4 role na barwę:
+         bg = tło chipa (odcienie 50/100), bg2 = hover (200/300),
+         fg = tekst (400/500/600), fg2 = tekst mocny (700/800/900) --- */
+  --t-blue-bg: 22 41 77;      --t-blue-bg2: 29 54 99;
+  --t-blue-fg: 96 165 250;    --t-blue-fg2: 147 180 255;
+  --t-green-bg: 15 47 40;     --t-green-bg2: 21 66 55;
+  --t-green-fg: 52 211 153;   --t-green-fg2: 110 231 183;
+  --t-red-bg: 58 21 38;       --t-red-bg2: 77 28 49;
+  --t-red-fg: 251 113 133;    --t-red-fg2: 253 164 175;
+  --t-yellow-bg: 58 44 13;    --t-yellow-bg2: 74 58 18;
+  --t-yellow-fg: 251 191 36;  --t-yellow-fg2: 252 211 77;
+  --t-indigo-bg: 32 34 74;    --t-indigo-bg2: 42 45 94;
+  --t-indigo-fg: 165 180 252; --t-indigo-fg2: 199 210 254;
+  --t-purple-bg: 42 33 80;    --t-purple-bg2: 55 44 102;
+  --t-purple-fg: 196 181 253; --t-purple-fg2: 221 214 254;
+
+  /* --- cienie: na ciemnym tle domyślne cienie Tailwinda (alpha 0.05–0.1) są
+         niewidoczne, więc mocniejsza czerń + wewnętrzny highlight u góry --- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow: 0 2px 6px -1px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --shadow-md: 0 6px 14px -3px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --shadow-xl: 0 20px 40px -10px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --shadow-2xl: 0 32px 64px -16px rgb(0 0 0 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.07);
+}
+
+/* ===================== MOTYW JASNY ===================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+  accent-color: #4f46e5;
+
+  --c-bg: 248 250 252;               /* #f8fafc */
+  --c-surface: 255 255 255;          /* #ffffff */
+  --c-surface-2: 241 245 249;        /* #f1f5f9 */
+  --c-scrim: 15 23 42;               /* #0f172a */
+
+  /* Na jasnym tle obie role akcentu mogą być tym samym nasyconym kolorem:
+     czytelny jako tekst (6.9:1) i nosi biały tekst jako tło (6.9:1). */
+  --c-primary: 79 70 229;            /* #4f46e5 */
+  --c-primary-solid: 79 70 229;
+  --c-primary-solid-hover: 67 56 202; /* #4338ca  hover = ciemniej */
+
+  --c-accent: 8 145 178;             /* #0891b2  cyan przyciemniony pod biel */
+
+  --c-success: 5 150 105;
+  --c-success-solid: 5 150 105;
+  --c-success-solid-hover: 4 120 87;
+  --c-danger: 225 29 72;
+  --c-danger-solid: 225 29 72;
+  --c-warning: 217 119 6;
+
+  --c-text: 15 23 42;
+  --c-text-muted: 71 85 105;
+  --c-text-dim: 100 116 139;
+  --c-border: 226 232 240;
+
+  /* Rampa gray w NORMALNEJ kolejności — role odcieni zostają te same */
+  --g-50: 248 250 252;   --g-100: 241 245 249;  --g-200: 226 232 240;
+  --g-300: 203 213 225;  --g-400: 148 163 184;  --g-500: 100 116 139;
+  --g-600: 71 85 105;    --g-700: 51 65 85;     --g-800: 30 41 59;
+  --g-900: 15 23 42;     --g-950: 2 6 23;
+
+  --t-blue-bg: 219 234 254;   --t-blue-bg2: 191 219 254;
+  --t-blue-fg: 59 130 246;    --t-blue-fg2: 29 78 216;
+  --t-green-bg: 220 252 231;  --t-green-bg2: 187 247 208;
+  --t-green-fg: 34 197 94;    --t-green-fg2: 21 128 61;
+  --t-red-bg: 254 226 226;    --t-red-bg2: 254 202 202;
+  --t-red-fg: 239 68 68;      --t-red-fg2: 185 28 28;
+  --t-yellow-bg: 254 243 199; --t-yellow-bg2: 253 230 138;
+  --t-yellow-fg: 245 158 11;  --t-yellow-fg2: 161 98 7;
+  --t-indigo-bg: 224 231 255; --t-indigo-bg2: 199 210 254;
+  --t-indigo-fg: 99 102 241;  --t-indigo-fg2: 67 56 202;
+  --t-purple-bg: 243 232 255; --t-purple-bg2: 233 213 255;
+  --t-purple-fg: 168 85 247;  --t-purple-fg2: 126 34 206;
+
+  /* Na jasnym tle wracamy do subtelnych cieni, bez wewnętrznego highlightu */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.1), 0 1px 2px -1px rgb(15 23 42 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.1), 0 2px 4px -2px rgb(15 23 42 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.1), 0 4px 6px -4px rgb(15 23 42 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.1), 0 8px 10px -6px rgb(15 23 42 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(15 23 42 / 0.25);
 }
 
 /* Podświetlenie strefy drop przy przeciąganiu paragonu (app.js: #receipt-upload-area).
