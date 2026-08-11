@@ -1,0 +1,118 @@
+/* ==========================================================================
+   Wydatki 2.0 — tokeny motywu (ciemny + neon)
+   --------------------------------------------------------------------------
+   UWAGA nt. kaskady: Tailwind Play CDN dopisuje swój <style> na koniec <head>
+   i odtwarza go, gdy zostanie usunięty. Ten plik NIGDY nie wygra z klasą
+   utility przy tej samej specyficzności. Dlatego trzymamy tu wyłącznie:
+     - :root ze zmiennymi (nie kolidują z niczym),
+     - color-scheme / accent-color,
+     - @keyframes,
+     - reguły o specyficzności >= 0-2-0 (np. .nav-item.is-active) lub !important.
+   Kolory komponentów definiujemy w tailwind.config w templates/base.html.
+
+   Zmienne trzymają KANAŁY RGB rozdzielone spacją (nie hex!), bo config używa
+   składni rgb(var(--c-x) / <alpha-value>) — inaczej modyfikatory przezroczystości
+   (bg-scrim/70, bg-opacity-75) wygenerowałyby nieprawidłowy kolor.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;         /* natywne date/select/checkbox/number/file na ciemno */
+  accent-color: #7c8aff;
+
+  /* --- powierzchnie --- */
+  --c-bg: 11 17 32;                  /* #0b1120  tło strony */
+  --c-surface: 21 28 46;             /* #151c2e  karty, sidebar, modale */
+  --c-surface-2: 28 36 56;           /* #1c2438  hover, elementy uniesione */
+  --c-scrim: 3 6 14;                 /* #03060e  backdrop modali */
+
+  /* --- akcent główny ---
+     Rozdzielony na dwie role, bo `text-primary` (57 użyć) chce być jasny na
+     ciemnym tle, a `bg-primary` (22 użycia) nosi biały tekst i musi być ciemny. */
+  --c-primary: 124 138 255;          /* #7c8aff  tekst / ikony / ring / border */
+  --c-primary-solid: 79 70 229;      /* #4f46e5  tło przycisku (biały tekst 6.9:1) */
+  --c-primary-solid-hover: 99 102 241; /* #6366f1  hover = jaśniej */
+
+  --c-accent: 34 211 238;            /* #22d3ee  neon cyan — poświaty, highlighty */
+
+  /* --- semantyka --- */
+  --c-success: 52 211 153;           /* #34d399 */
+  --c-success-solid: 5 150 105;      /* #059669 */
+  --c-success-solid-hover: 16 185 129; /* #10b981 */
+  --c-danger: 251 113 133;           /* #fb7185 */
+  --c-danger-solid: 225 29 72;       /* #e11d48 */
+  --c-warning: 251 191 36;           /* #fbbf24 */
+
+  /* --- tekst (mirror odwróconej rampy gray z tailwind.config) --- */
+  --c-text: 232 237 247;             /* #e8edf7 */
+  --c-text-muted: 154 168 194;       /* #9aa8c2 */
+  --c-text-dim: 107 122 150;         /* #6b7a96 */
+  --c-border: 37 48 73;              /* #253049 */
+}
+
+/* Podświetlenie strefy drop przy przeciąganiu paragonu (app.js: #receipt-upload-area).
+   !important jest konieczny — reguła walczy z klasami utility na tym samym elemencie. */
+.drag-over {
+  border-color: rgb(var(--c-primary)) !important;
+  background-color: rgb(var(--c-primary) / 0.12) !important;
+}
+
+/* Ekran logowania: bez offsetu pod sidebar i dolny pasek.
+   Specyficzność 0-2-0 (id + klasa) bije klasy utility na tym samym elemencie —
+   inaczej Play CDN, dopisujący swój <style> na końcu <head>, zawsze by wygrał. */
+#app-shell.is-anon { padding-left: 0 !important; padding-bottom: 0 !important; }
+
+/* Pola formularzy. `color-scheme: dark` daje im ciemne tło od przeglądarki, ale
+   każda przeglądarka trochę inne — ujednolicamy je do tła strony, żeby odcinały
+   się od powierzchni karty. Żaden input w projekcie nie ma własnej klasy `bg-*`,
+   więc nie nadpisujemy tu niczyjej intencji (specyficzność 0-2-1 bije utility). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  background-color: rgb(var(--c-bg));
+}
+input::placeholder, textarea::placeholder { color: rgb(var(--c-text-dim)); }
+
+/* Ukrycie pasków nawigacji przed zalogowaniem. Nie da się tu użyć klasy `hidden`,
+   bo `md:flex` na sidebarze i tak by ją przebiło w media query. */
+#navbar.is-hidden, #navbar-mobile.is-hidden { display: none !important; }
+
+/* Przyciski Admin są domyślnie `hidden` i odsłaniane z JS. Deklarujemy display
+   regułą o specyficzności 0-2-0 zamiast dokładać klasę `flex` — kolejność
+   utility `.flex` vs `.hidden` w wygenerowanym CSS jest wtedy bez znaczenia. */
+#nav-admin-btn:not(.hidden),
+#nav-admin-btn-mobile:not(.hidden) { display: flex; }
+
+/* Aktywna pozycja nawigacji (sidebar + dolny pasek + arkusz "Więcej") */
+.nav-item.is-active {
+  color: rgb(var(--c-primary));
+  background-color: rgb(var(--c-primary) / 0.12);
+}
+/* Neonowy wskaźnik: pionowy pasek w sidebarze, poziomy na dolnym pasku */
+#navbar .nav-item.is-active {
+  box-shadow: inset 3px 0 0 0 rgb(var(--c-accent)), 0 0 18px -6px rgb(var(--c-accent) / 0.55);
+}
+#navbar-mobile .nav-item.is-active {
+  background-color: transparent;
+  box-shadow: inset 0 2px 0 0 rgb(var(--c-accent));
+}
+
+/* Reguły krytyczne dla pierwszego paintu (.view, tło, color-scheme) celowo
+   zostają w inline <style> w templates/base.html — gdyby ten plik zaciągnął się
+   z opóźnieniem, wszystkie widoki SPA mignęłyby naraz. */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease-in; }
+
+/* Ładniejszy scrollbar w ciemnym motywie */
+* { scrollbar-color: rgb(var(--c-surface-2)) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-surface-2));
+  border-radius: 999px;
+  border: 2px solid rgb(var(--c-bg));
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-text-dim) / 0.6); }

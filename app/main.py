@@ -59,6 +59,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["js_version"] = str(int(os.path.getmtime("static/js/app.js")))
+templates.env.globals["css_version"] = str(int(os.path.getmtime("static/css/app.css")))
 
 # CORS — domeny konfigurowane w data/config/config.yaml (klucz allowed_origins)
 app.add_middleware(

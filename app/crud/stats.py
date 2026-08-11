@@ -10,6 +10,125 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.models import Category, Expense, ExpenseItem
 
 
+def expense_category_contributions(expense: Expense) -> List[dict]:
+    """
+    Rozbija pojedynczy wydatek na wkłady do poszczególnych kategorii.
+
+    Paragon może obejmować pozycje z różnych kategorii (np. w Lidlu serki i bułki
+    → Jedzenie, proszek → Dom), dlatego kwota wydatku rozkłada się na kilka
+    kategorii. Reguły:
+      - są pozycje → sumujemy je per kategoria pozycji,
+      - rozbieżność między sumą pozycji a kwotą wydatku (rabaty, zaokrąglenia)
+        → kategoria nagłówka wydatku,
+      - brak pozycji → cała kwota na kategorię nagłówka.
+
+    To JEDYNE miejsce z tą regułą — korzysta z niej zarówno podsumowanie
+    kategorii, jak i lista wydatków po rozwinięciu kategorii, żeby kwoty w obu
+    widokach zawsze się zgadzały.
+
+    Returns:
+        Lista dictów: category_id, category_name, amount, items
+    """
+    contributions: dict = {}
+
+    def add(cid, cname, amount, item=None):
+        entry = contributions.setdefault(
+            cid,
+            {"category_id": cid, "category_name": cname, "amount": 0.0, "items": []},
+        )
+        entry["category_name"] = cname
+        entry["amount"] += amount
+        if item is not None:
+            entry["items"].append(item)
+
+    if expense.items:
+        for item in expense.items:
+            quantity = item.quantity if item.quantity is not None else 1.0
+            add(
+                item.category_id,
+                item.category.name if item.category else None,
+                round(item.price * quantity, 4),
+                {
+                    "name": item.name,
+                    "quantity": quantity,
+                    "price": item.price,
+                    "total": round(item.price * quantity, 2),
+                },
+            )
+        items_sum = sum(
+            i.price * (i.quantity if i.quantity is not None else 1.0)
+            for i in expense.items
+        )
+        discrepancy = expense.amount - items_sum
+        if abs(discrepancy) > 0.005:
+            add(
+                expense.category_id,
+                expense.category.name if expense.category else None,
+                discrepancy,
+            )
+    else:
+        add(
+            expense.category_id,
+            expense.category.name if expense.category else None,
+            expense.amount,
+        )
+
+    return list(contributions.values())
+
+
+def get_category_expenses(
+    db: Session,
+    user_id: int,
+    category_id: Optional[int],
+    start_date: date,
+    end_date: date,
+    limit: int = 500,
+) -> List[dict]:
+    """
+    Zwraca wydatki składające się na daną kategorię w okresie — wraz z kwotą
+    faktycznie przypisaną do tej kategorii.
+
+    Paragon z pozycjami w kilku kategoriach pojawi się przy każdej z nich, ale
+    za każdym razem tylko z częścią kwoty odpowiadającą jej pozycjom.
+    `category_id=None` oznacza „Bez kategorii".
+    """
+    expenses = (
+        db.query(Expense)
+        .options(
+            joinedload(Expense.items).joinedload(ExpenseItem.category),
+            joinedload(Expense.category),
+        )
+        .filter(
+            Expense.user_id == user_id,
+            Expense.date >= start_date,
+            Expense.date <= end_date,
+        )
+        .order_by(Expense.date.desc(), Expense.id.desc())
+        .all()
+    )
+
+    results = []
+    for expense in expenses:
+        for contribution in expense_category_contributions(expense):
+            if contribution["category_id"] != category_id:
+                continue
+            amount = round(contribution["amount"], 2)
+            results.append(
+                {
+                    "expense_id": expense.id,
+                    "date": expense.date,
+                    "description": expense.description,
+                    "amount": amount,
+                    "full_amount": round(expense.amount, 2),
+                    "is_partial": abs(contribution["amount"] - expense.amount) > 0.005,
+                    "items": contribution["items"],
+                }
+            )
+            break
+
+    return results[:limit]
+
+
 def get_stats(
     db: Session,
     user_id: int,
@@ -109,28 +228,10 @@ def get_stats(
     cat_data = defaultdict(lambda: {"name": None, "total": 0.0, "expense_ids": set()})
 
     for expense in expenses_for_cats:
-        if expense.items:
-            for item in expense.items:
-                item_amount = round(item.price * item.quantity, 4)
-                cid = item.category_id
-                cname = item.category.name if item.category else None
-                cat_data[cid]["name"] = cname
-                cat_data[cid]["total"] += item_amount
-                cat_data[cid]["expense_ids"].add(expense.id)
-            # Rozbieżność (rabaty / zaokrąglenia) → kategoria nagłówka
-            items_sum = sum(item.price * item.quantity for item in expense.items)
-            discrepancy = expense.amount - items_sum
-            if abs(discrepancy) > 0.005:
-                cid = expense.category_id
-                cname = expense.category.name if expense.category else None
-                cat_data[cid]["name"] = cname
-                cat_data[cid]["total"] += discrepancy
-                cat_data[cid]["expense_ids"].add(expense.id)
-        else:
-            cid = expense.category_id
-            cname = expense.category.name if expense.category else None
-            cat_data[cid]["name"] = cname
-            cat_data[cid]["total"] += expense.amount
+        for contribution in expense_category_contributions(expense):
+            cid = contribution["category_id"]
+            cat_data[cid]["name"] = contribution["category_name"]
+            cat_data[cid]["total"] += contribution["amount"]
             cat_data[cid]["expense_ids"].add(expense.id)
 
     category_summary = []

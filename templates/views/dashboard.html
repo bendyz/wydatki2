@@ -1,8 +1,8 @@
 <!-- Dashboard View -->
-<div id="view-dashboard" class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-7">
+<div id="view-dashboard" class="view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5">
 
   <!-- AI Quick Add -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 mb-5">
+  <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-3 md:p-4 mb-5">
     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
       <i class="fas fa-robot text-primary mr-1"></i> Dodaj wydatek z AI
     </h2>
@@ -20,10 +20,10 @@
       <div class="flex-1 flex gap-2">
         <input type="text" id="dash-text-input"
           placeholder="np. 10 zł w żabce na colę..."
-          class="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           onkeydown="if(event.key==='Enter') dashboardAnalyzeText()" />
         <button onclick="dashboardAnalyzeText()"
-          class="bg-primary text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 whitespace-nowrap transition-colors">
+          class="bg-primary-solid text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-primary-solid-hover whitespace-nowrap transition-colors">
           <i class="fas fa-brain mr-1 hidden sm:inline"></i>Analizuj
         </button>
       </div>
@@ -36,7 +36,7 @@
   </div>
 
   <!-- Filters -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 p-3 md:p-4">
+  <div class="bg-surface rounded-xl shadow-sm border border-gray-200 mb-4 p-3 md:p-4">
     <div class="flex flex-wrap gap-2 md:gap-3 items-end">
       <div class="flex-1 min-w-[130px]">
         <label class="block text-xs font-medium text-gray-600 mb-1">Od</label>
@@ -65,7 +65,7 @@
           <input type="checkbox" id="filter-search-items" class="rounded border-gray-300 text-primary" />
           szukaj w pozycjach
         </label>
-        <button onclick="loadExpenses()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+        <button onclick="loadExpenses()" class="bg-primary-solid text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-solid-hover transition-colors">
           <i class="fas fa-filter mr-1"></i> Filtruj
         </button>
       </div>
@@ -79,20 +79,20 @@
   </div>
 
   <!-- Expenses list -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <!-- Desktop table -->
     <div class="hidden md:block overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opis</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategoria</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Kwota</th>
-            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opis</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategoria</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Kwota</th>
+            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
           </tr>
         </thead>
-        <tbody id="expenses-list" class="bg-white divide-y divide-gray-200">
+        <tbody id="expenses-list" class="bg-surface divide-y divide-gray-200">
           <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Wczytywanie...</td></tr>
         </tbody>
       </table>
@@ -104,7 +104,7 @@
   <!-- Load more -->
   <div id="load-more-container" class="hidden mt-4 text-center">
     <button onclick="loadMoreExpenses()"
-      class="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+      class="px-6 py-2.5 bg-surface border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-surface-2 transition-colors shadow-sm">
       <i class="fas fa-chevron-down mr-2"></i>Wczytaj więcej
     </button>
   </div>
@@ -112,10 +112,10 @@
 
 <!-- Expense Details Modal -->
 <div id="expense-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeExpenseModal()"></div>
+  <div class="fixed inset-0 bg-scrim bg-opacity-70" onclick="closeExpenseModal()"></div>
   <div class="fixed inset-0 z-10 overflow-y-auto">
     <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
-      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+      <div class="relative w-full sm:max-w-lg bg-surface rounded-t-2xl sm:rounded-xl shadow-xl">
         <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
           <h3 class="text-base font-semibold text-gray-900">Szczegóły wydatku</h3>
           <button onclick="closeExpenseModal()" class="text-gray-400 hover:text-gray-600 p-1">
@@ -216,10 +216,10 @@
           <button onclick="deleteExpenseModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-red-50 text-danger text-sm font-medium hover:bg-red-100">
             <i class="fas fa-trash"></i> Usuń
           </button>
-          <button onclick="closeExpenseModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
+          <button onclick="closeExpenseModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-surface-2">
             Anuluj
           </button>
-          <button onclick="saveExpenseModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success text-white text-sm font-semibold hover:bg-green-600">
+          <button onclick="saveExpenseModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success-solid text-white text-sm font-semibold hover:bg-success-solid-hover">
             <i class="fas fa-check"></i> Zapisz
           </button>
         </div>

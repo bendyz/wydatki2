@@ -83,6 +83,8 @@ class Category(Base):
     user_id = Column(
         Integer, ForeignKey("users.id"), nullable=True
     )  # Nullable for global/system categories
+    color = Column(String, nullable=True)  # hex, np. "#22d3ee" – nadawany automatycznie
+    icon = Column(String, nullable=True)  # klasa Font Awesome, np. "fa-cart-shopping"
 
     # Relationships
     user = relationship("User", back_populates="categories")

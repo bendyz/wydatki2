@@ -24,6 +24,33 @@ class CategorySummary(BaseModel):
     expense_count: int
 
 
+class CategoryExpenseItem(BaseModel):
+    """Pozycja paragonu należąca do rozwijanej kategorii"""
+
+    name: str
+    quantity: float
+    price: float
+    total: float
+
+
+class CategoryExpenseEntry(BaseModel):
+    """
+    Wydatek składający się na daną kategorię.
+
+    `amount` to kwota przypisana do TEJ kategorii, nie cała kwota paragonu —
+    paragon z pozycjami w kilku kategoriach pojawi się przy każdej z nich,
+    za każdym razem tylko z odpowiadającą jej częścią.
+    """
+
+    expense_id: int
+    date: date
+    description: Optional[str] = None
+    amount: float
+    full_amount: float
+    is_partial: bool
+    items: List[CategoryExpenseItem] = []
+
+
 class DailyExpense(BaseModel):
     """Wydatek w konkretnym dniu (do wykresów liniowych)"""
 

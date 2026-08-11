@@ -1,15 +1,15 @@
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
-from app.crud.stats import export_expenses_to_csv, get_stats
+from app.crud.stats import export_expenses_to_csv, get_category_expenses, get_stats
 from app.db.session import get_db
 from app.models.models import User
-from app.schemas.stats import StatsResponse
+from app.schemas.stats import CategoryExpenseEntry, StatsResponse
 
 router = APIRouter()
 
@@ -36,6 +36,37 @@ def read_stats(
         end_date=end_date,
     )
     return stats
+
+
+@router.get(
+    "/category-expenses",
+    response_model=List[CategoryExpenseEntry],
+    summary="Wydatki składające się na daną kategorię",
+)
+def read_category_expenses(
+    start_date: date,
+    end_date: date,
+    category_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Zwraca wydatki tworzące podsumowanie danej kategorii w zadanym okresie.
+
+    W odróżnieniu od `GET /expenses/?category_id=...` uwzględnia paragony, których
+    kategoria nagłówka jest inna, ale zawierają pozycje z tej kategorii — i podaje
+    wtedy tylko kwotę odpowiadającą tym pozycjom. Suma zwróconych kwot zgadza się
+    z `total_amount` tej kategorii w `GET /stats/`.
+
+    Pominięcie `category_id` zwraca wydatki bez kategorii.
+    """
+    return get_category_expenses(
+        db,
+        user_id=current_user.id,
+        category_id=category_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @router.get(

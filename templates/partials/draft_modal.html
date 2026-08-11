@@ -1,9 +1,9 @@
 <!-- Draft Review Modal (global, triggered from dashboard and add-expense) -->
 <div id="draft-modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="discardDraft()"></div>
+  <div class="fixed inset-0 bg-scrim bg-opacity-70" onclick="discardDraft()"></div>
   <div class="fixed inset-0 z-10 overflow-y-auto">
     <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
-      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-2xl">
+      <div class="relative w-full sm:max-w-lg bg-surface rounded-t-2xl sm:rounded-xl shadow-2xl">
         <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
           <div class="flex items-center gap-2">
             <i class="fas fa-robot text-primary text-lg"></i>
@@ -90,7 +90,7 @@
 
         <div class="px-4 py-3 border-t flex gap-3">
           <button onclick="saveDraftExpense()"
-            class="flex-1 bg-success text-white py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-green-600 transition-colors">
+            class="flex-1 bg-success-solid text-white py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-success-solid-hover transition-colors">
             <i class="fas fa-check mr-2"></i>Zapisz wydatek
           </button>
           <button onclick="discardDraft()"
@@ -105,9 +105,9 @@
 
 <!-- Mini-modal: dodawanie nowej kategorii z poziomu draftu -->
 <div id="new-cat-inline-modal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeInlineCategoryForm()"></div>
+  <div class="fixed inset-0 bg-scrim bg-opacity-70" onclick="closeInlineCategoryForm()"></div>
   <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
-    <div class="relative w-full max-w-xs bg-white rounded-xl shadow-2xl p-4">
+    <div class="relative w-full max-w-xs bg-surface rounded-xl shadow-2xl p-4">
       <h3 class="text-sm font-bold text-gray-900 mb-3">
         <i class="fas fa-plus text-primary mr-1"></i> Nowa kategoria
       </h3>
@@ -116,7 +116,7 @@
         onkeydown="if(event.key==='Enter'){event.preventDefault();submitInlineCategory();} else if(event.key==='Escape'){closeInlineCategoryForm();}" />
       <div class="flex gap-2 mt-4">
         <button onclick="submitInlineCategory()"
-          class="flex-1 bg-primary text-white py-2 px-3 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+          class="flex-1 bg-primary-solid text-white py-2 px-3 rounded-lg text-sm font-semibold hover:bg-primary-solid-hover transition-colors">
           Dodaj
         </button>
         <button onclick="closeInlineCategoryForm()"

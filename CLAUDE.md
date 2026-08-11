@@ -34,6 +34,30 @@ There are no tests in this project.
 - **Image processing**: OpenCV (`image_service.py`) converts receipt photos to grayscale + adaptive threshold before sending to AI
 - **Background jobs**: APScheduler (`app/worker/scheduler.py`) runs daily at midnight to generate expenses from due subscriptions
 
+### Styling — IMPORTANT: the `gray` ramp is INVERTED
+The app is dark-only. There is no build step (Tailwind Play CDN), so the theme is
+implemented by **remapping Tailwind's palette** in the inline `tailwind.config` in
+`templates/base.html` — not by rewriting the ~550 color classes across 12 templates
+and 48 `innerHTML` blocks in `app.js`.
+
+**The `gray` scale means the opposite of what you expect: `gray-50` is the darkest,
+`gray-900` the lightest.** This is what makes existing classes correct on dark —
+`text-gray-900` (headings) resolves light, `text-gray-500` (labels) mid, `bg-gray-50`
+(page background, table `thead`) dark. When writing new markup, keep using the same
+semantic conventions as the rest of the codebase and it will work.
+
+Other conventions that follow from this:
+- `bg-white` is not used — cards use `bg-surface` (`white` stays real white because
+  `text-white` sits on colored buttons).
+- Filled buttons use `bg-primary-solid` / `bg-success-solid` (dark enough for white
+  text); `text-primary` / `text-success` are the bright variants for text and icons.
+- Modal backdrops use `bg-scrim`, never `bg-gray-500`/`bg-gray-900`.
+- Hover on rows and ghost buttons goes *lighter*: `hover:bg-surface-2`.
+- `static/css/app.css` holds `:root` design tokens as **space-separated RGB channels**
+  (`--c-surface: 21 28 46`), consumed by the config as `rgb(var(--c-x) / <alpha-value>)`.
+  The Play CDN appends its `<style>` last, so `app.css` can only hold `:root` vars,
+  `@keyframes`, and rules with `!important` or specificity ≥ 0-2-0.
+
 ### Configuration
 All settings live in `data/config/config.yaml` (loaded by `app/core/config.py`). Three env vars override YAML: `OPENROUTER_API_KEY`, `DATABASE_URL`, `PORT`. The SQLite database is at `data/db/wydatki.db`. Receipt images are stored under `data/uploads/receipts/<expense_id>/`.
 

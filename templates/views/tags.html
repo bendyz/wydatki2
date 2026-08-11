@@ -1,5 +1,5 @@
 <!-- Tags View -->
-<div id="view-tags" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-7">
+<div id="view-tags" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5">
 
   <!-- Management panel -->
   <div id="tags-management-panel">
@@ -11,17 +11,17 @@
       <i class="fas fa-spinner fa-spin mr-2"></i>Wczytywanie...
     </div>
 
-    <div id="tags-table-wrap" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div id="tags-table-wrap" class="hidden bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Wydatki</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Suma</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Akcje</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Wydatki</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Suma</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Akcje</th>
           </tr>
         </thead>
-        <tbody id="tags-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+        <tbody id="tags-table-body" class="bg-surface divide-y divide-gray-200"></tbody>
       </table>
       <div id="tags-empty" class="hidden p-8 text-center text-gray-400">
         <i class="fas fa-tags text-3xl mb-2 block"></i>Brak tagów. Dodaj pierwszy tag do dowolnego wydatku.
@@ -40,13 +40,13 @@
     </div>
 
     <!-- Category breakdown -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+    <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
       <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Podział na kategorie</h2>
       <div id="tag-detail-categories" class="space-y-2"></div>
     </div>
 
     <!-- Monthly chart -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+    <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
       <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Sumy miesięczne (ostatnie 12 mies.)</h2>
       <div class="relative h-48">
         <canvas id="tag-monthly-chart"></canvas>
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Expense list -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100">
         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Wydatki</h2>
       </div>

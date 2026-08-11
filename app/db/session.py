@@ -92,3 +92,15 @@ def init_db():
             conn.execute(text("ALTER TABLE categories_new RENAME TO categories"))
             conn.execute(text("PRAGMA foreign_keys=on"))
             conn.commit()
+        # UWAGA: te dwie kolumny MUSZĄ być dodawane PO przebudowie tabeli powyżej —
+        # jej CREATE/INSERT SELECT ma zaszytą listę kolumn i skasowałby je po drodze.
+        try:
+            conn.execute(text("ALTER TABLE categories ADD COLUMN color VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass  # kolumna już istnieje
+        try:
+            conn.execute(text("ALTER TABLE categories ADD COLUMN icon VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass

@@ -8,6 +8,11 @@ class CategoryBase(BaseModel):
 
     name: str
     user_id: Optional[int] = None
+    # Muszą mieć wartości domyślne — CategoryResponse dziedziczy po CategoryBase,
+    # więc pola bez domyślnych stałyby się wymagane w CategoryCreate i zepsuły
+    # istniejących klientów (m.in. aplikację na Androida).
+    color: Optional[str] = None  # hex, np. "#22d3ee"; brak → nadawany automatycznie
+    icon: Optional[str] = None  # klasa Font Awesome, np. "fa-cart-shopping"
 
 
 class CategoryCreate(CategoryBase):
@@ -21,6 +26,8 @@ class CategoryUpdate(BaseModel):
 
     name: Optional[str] = None
     user_id: Optional[int] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
 
 
 class CategoryResponse(CategoryBase):

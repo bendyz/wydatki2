@@ -5,148 +5,225 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Wydatki 2.0 - AI Expense Manager{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <!-- Krytyczny CSS PRZED skryptem CDN. Tailwind Play kompiluje asynchronicznie,
+         więc pierwszy paint leci bez żadnych stylów — bez tego bloku widać biały
+         błysk i wszystkie widoki SPA naraz. -->
+    <style>
+        html { background: #0b1120; color-scheme: dark; }
+        body { margin: 0; background: #0b1120; color: #e8edf7; }
+        .view { display: none !important; }
+        .view.active { display: block !important; }
+        #view-login.active { display: flex !important; }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
+        // Motyw ciemny realizowany przez PRZEMAPOWANIE palety Tailwinda, nie przez
+        // przepisywanie klas w szablonach. Szczegóły i konwencje: CLAUDE.md.
+        const rgb = (v) => `rgb(var(${v}) / <alpha-value>)`;
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: "#3b82f6",
-                        secondary: "#64748b",
-                        success: "#22c55e",
-                        danger: "#ef4444",
-                        warning: "#f59e0b",
+                        // ⚠️ RAMPA `gray` JEST ODWRÓCONA: 50 = najciemniejszy, 900 = najjaśniejszy.
+                        // Dzięki temu istniejące klasy działają na ciemnym tle bez zmian:
+                        // text-gray-900 (nagłówek) → jasny, text-gray-500 (etykieta) → średni,
+                        // bg-gray-50 (tło strony / thead) → ciemny, border-gray-300 → ciemny.
+                        // Nie „naprawiaj" tego, pisząc odwrotnie — trzymaj się konwencji z reszty kodu.
+                        gray: {
+                            50: "#0f1626", 100: "#1a2235", 200: "#253049", 300: "#33405c",
+                            400: "#6b7a96", 500: "#9aa8c2", 600: "#aab6cd", 700: "#c9d3e5",
+                            800: "#dde4f0", 900: "#e8edf7", 950: "#f5f8ff",
+                        },
+
+                        // Powierzchnie. `white` celowo NIE jest przemapowany — text-white (31×)
+                        // musi zostać biały na kolorowych przyciskach.
+                        bg: rgb("--c-bg"),
+                        surface: rgb("--c-surface"),
+                        "surface-2": rgb("--c-surface-2"),
+                        scrim: rgb("--c-scrim"),
+                        accent: rgb("--c-accent"),
+
+                        // Akcenty rozdzielone na rolę tekstową (DEFAULT, jasna) i tłową
+                        // (`solid`, ciemniejsza — nosi biały tekst). Hover idzie JAŚNIEJ.
+                        primary: {
+                            DEFAULT: rgb("--c-primary"),
+                            solid: rgb("--c-primary-solid"),
+                            "solid-hover": rgb("--c-primary-solid-hover"),
+                        },
+                        success: {
+                            DEFAULT: rgb("--c-success"),
+                            solid: rgb("--c-success-solid"),
+                            "solid-hover": rgb("--c-success-solid-hover"),
+                        },
+                        danger: {
+                            DEFAULT: rgb("--c-danger"),
+                            solid: rgb("--c-danger-solid"),
+                        },
+                        warning: rgb("--c-warning"),
+                        secondary: "#9aa8c2",
+
+                        // Skale barwne: odcienie -50/-100/-200 pełnią wyłącznie rolę TŁA chipów
+                        // (→ ciemne tinty), odcienie -400..-900 wyłącznie rolę TEKSTU (→ neony).
+                        blue: {
+                            50: "#131e3a", 100: "#16294d", 200: "#1d3663", 300: "#2a4a85",
+                            400: "#60a5fa", 500: "#7c8aff", 600: "#93b4ff", 700: "#a5c4ff",
+                            800: "#c2d8ff", 900: "#dce8ff",
+                        },
+                        green: {
+                            50: "#0b2620", 100: "#0f2f28", 200: "#154237", 300: "#1d5c4b",
+                            400: "#34d399", 500: "#10b981", 600: "#4ade80", 700: "#6ee7b7",
+                            800: "#a7f3d0", 900: "#d1fae5",
+                        },
+                        red: {
+                            50: "#2a1220", 100: "#3a1526", 200: "#4d1c31", 300: "#6b2440",
+                            400: "#fb7185", 500: "#f43f5e", 600: "#fda4af", 700: "#fda4af",
+                            800: "#fecdd3", 900: "#ffe4e6",
+                        },
+                        yellow: {
+                            50: "#2b210a", 100: "#3a2c0d", 200: "#4a3a12", 300: "#5e4a17",
+                            400: "#fbbf24", 500: "#f59e0b", 600: "#fcd34d", 700: "#fcd34d",
+                            800: "#fde68a", 900: "#fef3c7",
+                        },
+                        indigo: {
+                            50: "#1a1b3d", 100: "#20224a", 200: "#2a2d5e",
+                            400: "#a5b4fc", 500: "#8b93fb", 600: "#a5b4fc", 700: "#c7d2fe",
+                        },
+                        purple: {
+                            50: "#211a3d", 100: "#2a2150", 400: "#c4b5fd", 500: "#a78bfa",
+                            600: "#c4b5fd", 700: "#ddd6fe",
+                        },
+                    },
+
+                    // Domyślnie #fff → biała aureola wokół focusa na ciemnym tle.
+                    ringOffsetColor: { DEFAULT: "#0b1120" },
+
+                    // Domyślne cienie Tailwinda (czerń przy alpha 0.05–0.1) są na #0b1120
+                    // niewidoczne i wszystkie karty tracą uniesienie. Mocniejsza czerń
+                    // + wewnętrzny highlight u góry dają czytelną głębię.
+                    boxShadow: {
+                        sm: "0 1px 2px 0 rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04)",
+                        DEFAULT: "0 2px 6px -1px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.05)",
+                        md: "0 6px 14px -3px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05)",
+                        lg: "0 12px 24px -6px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.06)",
+                        xl: "0 20px 40px -10px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.06)",
+                        "2xl": "0 32px 64px -16px rgb(0 0 0 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.07)",
+                        // Neonowa poświata — przycisk primary, aktywna pozycja nawigacji.
+                        glow: "0 0 0 1px rgb(var(--c-accent) / 0.35), 0 8px 28px -10px rgb(var(--c-accent) / 0.5)",
+                        "glow-primary": "0 8px 24px -10px rgb(var(--c-primary-solid) / 0.9)",
                     },
                 },
             },
         };
     </script>
-    <style>
-        .view { display: none !important; }
-        .view.active { display: block !important; }
-        #view-login.active { display: flex !important; }
-        .drag-over {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
-        }
-        .fade-in {
-            animation: fadeIn 0.3s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v={{ css_version }}">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav id="navbar" class="bg-white shadow-sm border-b hidden">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <i class="fas fa-wallet text-primary text-2xl mr-3"></i>
-                    <span class="font-bold text-xl text-gray-800">Wydatki 2.0</span>
-                </div>
-                <!-- Desktop menu -->
-                <div class="hidden md:flex items-center space-x-4">
-                    <button onclick="showView('dashboard')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-chart-pie mr-1"></i> Dashboard
-                    </button>
-                    <button onclick="showView('stats')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-chart-bar mr-1"></i> Statystyki
-                    </button>
-                    <button onclick="showView('add-expense')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-plus mr-1"></i> Dodaj wydatek
-                    </button>
-                    <button onclick="showView('categories')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-tags mr-1"></i> Kategorie
-                    </button>
-                    <button onclick="showView('subscriptions')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-sync mr-1"></i> Abonamenty
-                    </button>
-                    <button onclick="showView('tags')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-hashtag mr-1"></i> Tagi
-                    </button>
-                    {% if enable_payment_cards %}
-                    <button onclick="showView('cards')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-credit-card mr-1"></i> Karty
-                    </button>
-                    {% endif %}
-                    {% if enable_assets %}
-                    <button onclick="showView('assets')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-piggy-bank mr-1"></i> Majątek
-                    </button>
-                    {% endif %}
-                    <button id="nav-admin-btn" onclick="showView('admin')" class="hidden nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                        <i class="fas fa-cog mr-1"></i> Admin
-                    </button>
-                    <button onclick="logout()" class="px-3 py-2 rounded-md text-sm font-medium text-danger hover:bg-red-50">
-                        <i class="fas fa-sign-out-alt mr-1"></i> Wyloguj
-                    </button>
-                </div>
-                <!-- Mobile menu button -->
-                <div class="flex items-center md:hidden">
-                    <button onclick="toggleMobileMenu()" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                </div>
-            </div>
+{#
+   Nawigacja definiowana JEDEN raz i renderowana dwa razy: jako sidebar (>=md)
+   i jako dolny pasek (<md). `primary` oznacza pozycje widoczne wprost na dolnym
+   pasku — reszta trafia do arkusza "Więcej".
+#}
+{% set nav_items = [
+    {'view': 'dashboard',     'icon': 'fa-chart-pie',   'label': 'Dashboard',     'primary': true},
+    {'view': 'stats',         'icon': 'fa-chart-bar',   'label': 'Statystyki',    'primary': true},
+    {'view': 'add-expense',   'icon': 'fa-plus',        'label': 'Dodaj wydatek', 'primary': true},
+    {'view': 'categories',    'icon': 'fa-tags',        'label': 'Kategorie'},
+    {'view': 'subscriptions', 'icon': 'fa-sync',        'label': 'Abonamenty'},
+    {'view': 'tags',          'icon': 'fa-hashtag',     'label': 'Tagi'},
+    {'view': 'cards',         'icon': 'fa-credit-card', 'label': 'Karty',   'flag': 'cards'},
+    {'view': 'assets',        'icon': 'fa-piggy-bank',  'label': 'Majątek', 'flag': 'assets'},
+] %}
+{% set visible_nav = nav_items
+    | rejectattr('flag', 'equalto', 'cards')  | list if not enable_payment_cards else nav_items %}
+{% set visible_nav = visible_nav
+    | rejectattr('flag', 'equalto', 'assets') | list if not enable_assets else visible_nav %}
+
+    <!-- ===== Sidebar (desktop) ===== -->
+    <aside id="navbar" class="is-hidden hidden md:flex fixed inset-y-0 left-0 z-30 w-60 flex-col bg-surface border-r border-gray-200">
+        <div class="flex items-center gap-2.5 h-14 px-4 border-b border-gray-200">
+            <i class="fas fa-wallet text-primary text-xl"></i>
+            <span class="font-bold text-lg text-gray-900 tracking-tight">Wydatki 2.0</span>
         </div>
-        <!-- Mobile menu panel -->
-        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200">
-            <div class="pt-2 pb-3 space-y-1 px-4">
-                <button onclick="showView('dashboard'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-chart-pie mr-2"></i> Dashboard
-                </button>
-                <button onclick="showView('stats'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-chart-bar mr-2"></i> Statystyki
-                </button>
-                <button onclick="showView('add-expense'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-plus mr-2"></i> Dodaj wydatek
-                </button>
-                <button onclick="showView('categories'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-tags mr-2"></i> Kategorie
-                </button>
-                <button onclick="showView('subscriptions'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-sync mr-2"></i> Abonamenty
-                </button>
-                <button onclick="showView('tags'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-hashtag mr-2"></i> Tagi
-                </button>
-                {% if enable_payment_cards %}
-                <button onclick="showView('cards'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-credit-card mr-2"></i> Karty
-                </button>
-                {% endif %}
-                {% if enable_assets %}
-                <button onclick="showView('assets'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-piggy-bank mr-2"></i> Majątek
-                </button>
-                {% endif %}
-                <button id="nav-admin-btn-mobile" onclick="showView('admin'); toggleMobileMenu()" class="hidden block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-100">
-                    <i class="fas fa-cog mr-2"></i> Admin
-                </button>
-                <button onclick="logout(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-danger hover:bg-red-50">
-                    <i class="fas fa-sign-out-alt mr-2"></i> Wyloguj
-                </button>
-            </div>
+        <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+            {% for item in visible_nav %}
+            <button data-view="{{ item.view }}" onclick="showView('{{ item.view }}')"
+                class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:text-primary hover:bg-surface-2 transition-colors">
+                <i class="fas {{ item.icon }} w-4 text-center"></i><span>{{ item.label }}</span>
+            </button>
+            {% endfor %}
+        </nav>
+        <div class="px-2 py-3 border-t border-gray-200 space-y-0.5">
+            <button id="nav-admin-btn" data-view="admin" onclick="showView('admin')"
+                class="nav-item hidden w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:text-primary hover:bg-surface-2 transition-colors">
+                <i class="fas fa-cog w-4 text-center"></i><span>Admin</span>
+            </button>
+            <button onclick="logout()"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-danger hover:bg-red-50 transition-colors">
+                <i class="fas fa-sign-out-alt w-4 text-center"></i><span>Wyloguj</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ===== Dolny pasek (mobile) ===== -->
+    <nav id="navbar-mobile" class="is-hidden md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+        <div class="flex items-stretch">
+            {% for item in visible_nav if item.primary %}
+            <button data-view="{{ item.view }}" onclick="showView('{{ item.view }}')"
+                class="nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[52px] text-[11px] font-medium text-gray-500 hover:text-primary transition-colors">
+                <i class="fas {{ item.icon }} text-base"></i><span>{{ item.label.split(' ')[0] }}</span>
+            </button>
+            {% endfor %}
+            <button onclick="toggleMobileMenu()"
+                class="flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[52px] text-[11px] font-medium text-gray-500 hover:text-primary transition-colors">
+                <i class="fas fa-ellipsis text-base"></i><span>Więcej</span>
+            </button>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    {% block content %}{% endblock %}
+    <!-- ===== Arkusz "Więcej" (mobile) ===== -->
+    <div id="mobile-menu" class="hidden md:hidden fixed inset-0 z-40">
+        <div class="absolute inset-0 bg-scrim bg-opacity-70" onclick="toggleMobileMenu()"></div>
+        <div class="absolute bottom-0 inset-x-0 bg-surface rounded-t-2xl border-t border-gray-200 shadow-2xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+            <div class="w-10 h-1 rounded-full bg-gray-300 mx-auto mb-3"></div>
+            <div class="grid grid-cols-3 gap-2">
+                {% for item in visible_nav if not item.primary %}
+                <button data-view="{{ item.view }}" onclick="showView('{{ item.view }}'); toggleMobileMenu()"
+                    class="nav-item flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium text-gray-700 bg-surface-2 hover:text-primary transition-colors">
+                    <i class="fas {{ item.icon }} text-lg"></i><span>{{ item.label }}</span>
+                </button>
+                {% endfor %}
+                <button id="nav-admin-btn-mobile" data-view="admin" onclick="showView('admin'); toggleMobileMenu()"
+                    class="nav-item hidden flex-col items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium text-gray-700 bg-surface-2 hover:text-primary transition-colors">
+                    <i class="fas fa-cog text-lg"></i><span>Admin</span>
+                </button>
+            </div>
+            <button onclick="logout(); toggleMobileMenu()"
+                class="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-danger bg-red-50 transition-colors">
+                <i class="fas fa-sign-out-alt"></i><span>Wyloguj</span>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Main Content.
+         Offset pod sidebar / dolny pasek trzymamy TUTAJ, żeby nie ruszać kontenerów
+         poszczególnych widoków. Klasa `is-anon` (ustawiana z app.js) zeruje offset
+         na ekranie logowania, który ma własne min-h-screen i wyśrodkowanie. -->
+    <div id="app-shell" class="is-anon md:pl-60 pb-16 md:pb-0">
+        {% block content %}{% endblock %}
+    </div>
 
     <!-- Toast Notifications -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full px-4"></div>
 
     <!-- Change Password Modal -->
     <div id="change-password-modal" class="fixed inset-0 z-50 hidden" role="dialog">
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeChangePasswordModal()"></div>
+      <div class="fixed inset-0 bg-scrim bg-opacity-70" onclick="closeChangePasswordModal()"></div>
       <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div class="bg-surface rounded-xl shadow-xl w-full max-w-sm">
           <div class="flex items-center justify-between px-5 pt-5 pb-3 border-b">
             <h3 class="text-base font-semibold text-gray-900"><i class="fas fa-key text-primary mr-2"></i>Zmiana hasła</h3>
             <button onclick="closeChangePasswordModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
@@ -167,15 +244,15 @@
             </div>
           </div>
           <div class="px-5 pb-5 flex gap-2 justify-end">
-            <button onclick="closeChangePasswordModal()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">Anuluj</button>
-            <button onclick="changePassword()" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-blue-700">Zmień hasło</button>
+            <button onclick="closeChangePasswordModal()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-surface-2">Anuluj</button>
+            <button onclick="changePassword()" class="px-4 py-2 rounded-lg bg-primary-solid text-white text-sm font-semibold hover:bg-primary-solid-hover">Zmień hasło</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Global tag suggestions dropdown -->
-    <div id="tag-dropdown" class="hidden fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64">
+    <div id="tag-dropdown" class="hidden fixed z-[200] bg-surface border border-gray-200 rounded-xl shadow-lg p-3 w-64">
       <p class="text-xs text-gray-400 mb-2"><i class="fas fa-fire mr-1"></i>Najpopularniejsze:</p>
       <div id="tag-dropdown-list" class="flex flex-wrap gap-1.5"></div>
       <p id="tag-dropdown-empty" class="hidden text-xs text-gray-400 italic">Brak tagów</p>

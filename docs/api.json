@@ -3,7 +3,7 @@
   "info": {
     "title": "Wydatki 2.0",
     "description": "Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    "version": "0.4.6"
+    "version": "0.5.0"
   },
   "paths": {
     "/api/v1/auth/registration-status": {
@@ -575,7 +575,7 @@
           "categories"
         ],
         "summary": "Zaktualizuj kategorię",
-        "description": "Aktualizuje nazwę istniejącej kategorii użytkownika.",
+        "description": "Aktualizuje nazwę, kolor lub ikonę istniejącej kategorii użytkownika.\nPola pominięte w żądaniu pozostają bez zmian.",
         "operationId": "update_existing_category_api_v1_categories__category_id__put",
         "security": [
           {
@@ -1559,6 +1559,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats/category-expenses": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Wydatki składające się na daną kategorię",
+        "description": "Zwraca wydatki tworzące podsumowanie danej kategorii w zadanym okresie.\n\nW odróżnieniu od `GET /expenses/?category_id=...` uwzględnia paragony, których\nkategoria nagłówka jest inna, ale zawierają pozycje z tej kategorii — i podaje\nwtedy tylko kwotę odpowiadającą tym pozycjom. Suma zwróconych kwot zgadza się\nz `total_amount` tej kategorii w `GET /stats/`.\n\nPominięcie `category_id` zwraca wydatki bez kategorii.",
+        "operationId": "read_category_expenses_api_v1_stats_category_expenses_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryExpenseEntry"
+                  },
+                  "title": "Response Read Category Expenses Api V1 Stats Category Expenses Get"
                 }
               }
             }
@@ -3528,6 +3607,28 @@
               }
             ],
             "title": "User Id"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
           }
         },
         "type": "object",
@@ -3536,6 +3637,89 @@
         ],
         "title": "CategoryCreate",
         "description": "Schemat do tworzenia nowej kategorii"
+      },
+      "CategoryExpenseEntry": {
+        "properties": {
+          "expense_id": {
+            "type": "integer",
+            "title": "Expense Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "full_amount": {
+            "type": "number",
+            "title": "Full Amount"
+          },
+          "is_partial": {
+            "type": "boolean",
+            "title": "Is Partial"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryExpenseItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "expense_id",
+          "date",
+          "amount",
+          "full_amount",
+          "is_partial"
+        ],
+        "title": "CategoryExpenseEntry",
+        "description": "Wydatek składający się na daną kategorię.\n\n`amount` to kwota przypisana do TEJ kategorii, nie cała kwota paragonu —\nparagon z pozycjami w kilku kategoriach pojawi się przy każdej z nich,\nza każdym razem tylko z odpowiadającą jej częścią."
+      },
+      "CategoryExpenseItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "quantity",
+          "price",
+          "total"
+        ],
+        "title": "CategoryExpenseItem",
+        "description": "Pozycja paragonu należąca do rozwijanej kategorii"
       },
       "CategoryResponse": {
         "properties": {
@@ -3553,6 +3737,28 @@
               }
             ],
             "title": "User Id"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
           },
           "id": {
             "type": "integer",
@@ -3638,6 +3844,28 @@
               }
             ],
             "title": "User Id"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
           }
         },
         "type": "object",

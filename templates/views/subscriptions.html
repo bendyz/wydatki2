@@ -1,9 +1,9 @@
 <!-- Subscription Edit Modal -->
 <div id="sub-modal" class="fixed inset-0 z-40 hidden" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeSubModal()"></div>
+  <div class="fixed inset-0 bg-scrim bg-opacity-70" onclick="closeSubModal()"></div>
   <div class="fixed inset-0 z-10 overflow-y-auto">
     <div class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
-      <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-xl shadow-xl">
+      <div class="relative w-full sm:max-w-lg bg-surface rounded-t-2xl sm:rounded-xl shadow-xl">
         <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b">
           <h3 class="text-base font-semibold text-gray-900">Edytuj abonament</h3>
           <button onclick="closeSubModal()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fas fa-times"></i></button>
@@ -63,8 +63,8 @@
           <button onclick="deleteSubscription(document.getElementById('sub-modal-id').value)" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-red-50 text-danger text-sm font-medium hover:bg-red-100">
             <i class="fas fa-trash"></i> Usuń
           </button>
-          <button onclick="closeSubModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">Anuluj</button>
-          <button onclick="saveSubModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success text-white text-sm font-semibold hover:bg-green-600">
+          <button onclick="closeSubModal()" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-surface-2">Anuluj</button>
+          <button onclick="saveSubModal()" class="flex items-center justify-center gap-1 py-2 px-4 rounded-lg bg-success-solid text-white text-sm font-semibold hover:bg-success-solid-hover">
             <i class="fas fa-check"></i> Zapisz
           </button>
         </div>
@@ -74,18 +74,18 @@
 </div>
 
 <!-- Subscriptions View -->
-<div id="view-subscriptions" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-  <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+<div id="view-subscriptions" class="view max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5">
+  <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Abonamenty</h1>
       <p class="text-gray-600">Automatyczne wydatki cykliczne</p>
     </div>
-    <button onclick="showAddSubscriptionForm()" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto">
+    <button onclick="showAddSubscriptionForm()" class="bg-primary-solid text-white px-4 py-2 rounded-md hover:bg-primary-solid-hover w-full sm:w-auto">
       <i class="fas fa-plus mr-2"></i>Nowy abonament
     </button>
   </div>
 
-  <div id="add-subscription-form" class="hidden bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+  <div id="add-subscription-form" class="hidden bg-surface rounded-xl shadow-sm border border-gray-200 p-3 md:p-4 mb-4">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Nazwa</label>
@@ -132,21 +132,21 @@
       </div>
     </div>
     <div class="mt-4 flex flex-col sm:flex-row gap-2">
-      <button onclick="addSubscription()" class="bg-success text-white px-4 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">Zapisz</button>
+      <button onclick="addSubscription()" class="bg-success-solid text-white px-4 py-2 rounded-md hover:bg-success-solid-hover w-full sm:w-auto">Zapisz</button>
       <button onclick="hideAddSubscriptionForm()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto">Anuluj</button>
     </div>
   </div>
 
-  <div class="bg-white rounded-lg shadow overflow-hidden">
+  <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Kwota</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Cykl</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Następna płatność</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Kwota</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Cykl</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Następna płatność</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
           </tr>
         </thead>
         <tbody id="subscriptions-list" class="divide-y divide-gray-200">

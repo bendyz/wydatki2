@@ -36,7 +36,13 @@ def create_new_category(
     """
     Tworzy nową kategorię wydatków dla aktualnie zalogowanego użytkownika.
     """
-    db_category = create_category(db=db, name=category.name, user_id=current_user.id)
+    db_category = create_category(
+        db=db,
+        name=category.name,
+        user_id=current_user.id,
+        color=category.color,
+        icon=category.icon,
+    )
     if db_category is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -105,12 +111,16 @@ def update_existing_category(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Aktualizuje nazwę istniejącej kategorii użytkownika.
+    Aktualizuje nazwę, kolor lub ikonę istniejącej kategorii użytkownika.
+    Pola pominięte w żądaniu pozostają bez zmian.
     """
-    if category_update.name is None:
+    if all(
+        v is None
+        for v in (category_update.name, category_update.color, category_update.icon)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Pole 'name' jest wymagane do aktualizacji",
+            detail="Podaj co najmniej jedno z pól: 'name', 'color', 'icon'",
         )
 
     updated = update_category(
@@ -118,6 +128,8 @@ def update_existing_category(
         category_id=category_id,
         user_id=current_user.id,
         name=category_update.name,
+        color=category_update.color,
+        icon=category_update.icon,
     )
     if not updated:
         raise HTTPException(

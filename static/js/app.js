@@ -1,3 +1,43 @@
+// ==================== MOTYW / KOLORY ====================
+// Jedno źródło prawdy: zmienne CSS z static/css/app.css (kanały RGB "r g b").
+// Dzięki temu wykresy, toasty i CSS nie rozjeżdżają się przy zmianie palety.
+function themeColor(name, alpha = 1) {
+    const raw = getComputedStyle(document.documentElement)
+        .getPropertyValue(`--c-${name}`)
+        .trim();
+    if (!raw) return alpha === 1 ? "#7c8aff" : `rgba(124, 138, 255, ${alpha})`;
+    return alpha === 1 ? `rgb(${raw})` : `rgb(${raw} / ${alpha})`;
+}
+
+// Neonowa paleta kategorii / serii — czytelna na ciemnym tle.
+// Ta sama lista co CATEGORY_PALETTE w app/crud/category.py (kolory nadawane w bazie).
+const CHART_PALETTE = [
+    "#22d3ee", "#34d399", "#fbbf24", "#fb7185", "#a78bfa", "#f472b6",
+    "#4ade80", "#60a5fa", "#fb923c", "#2dd4bf", "#e879f9", "#facc15",
+];
+
+// Globalne domyślne Chart.js — bez tego etykiety osi, legenda i tooltipy
+// renderują się w kolorze #666 (domyślny Chart.js 4), nieczytelnym na ciemnym.
+function applyChartTheme() {
+    if (typeof Chart === "undefined") return;
+    Chart.defaults.color = themeColor("text-muted");
+    Chart.defaults.borderColor = themeColor("border");
+    Chart.defaults.font.family =
+        "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
+    Chart.defaults.scale.grid.color = themeColor("border", 0.6);
+    Chart.defaults.scale.grid.drawBorder = false;
+    Chart.defaults.scale.ticks.color = themeColor("text-dim");
+    Chart.defaults.plugins.legend.labels.color = themeColor("text-muted");
+    Chart.defaults.plugins.tooltip.backgroundColor = themeColor("surface-2");
+    Chart.defaults.plugins.tooltip.titleColor = themeColor("text");
+    Chart.defaults.plugins.tooltip.bodyColor = themeColor("text-muted");
+    Chart.defaults.plugins.tooltip.borderColor = themeColor("border");
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+}
+applyChartTheme();
+
 // ==================== STATE ====================
 const API_URL = "/api/v1";
 const EXPENSES_PER_PAGE = 50;
@@ -9,6 +49,39 @@ let cardsCache = [];
 // Specjalna wartość opcji "dodaj nową kategorię" w selectach draftu
 const NEW_CATEGORY_OPTION = "__new__";
 let pendingCategorySelect = null; // select, który wywołał formularz nowej kategorii
+
+// Kolor i ikona kategorii pochodzą z bazy (categoriesCache). Backend backfilluje
+// braki przy GET /categories/, więc tu wystarczy prosty fallback na wypadek,
+// gdyby cache nie był jeszcze załadowany.
+function categoryStyle(idOrName) {
+    const c = categoriesCache.find(
+        (x) => x.id === idOrName || x.name === idOrName
+    );
+    return {
+        color: (c && c.color) || "#9aa8c2",
+        icon: (c && c.icon) || "fa-tag",
+    };
+}
+
+// Dociąga kategorie, jeśli cache jest jeszcze pusty (np. wejście prosto w Statystyki).
+async function ensureCategoriesCache() {
+    if (categoriesCache.length) return;
+    try {
+        categoriesCache = await apiRequest("GET", "/categories/?include_global=true");
+    } catch (e) {
+        // brak kolorów jest do przeżycia — zadziała fallback w categoryStyle()
+    }
+}
+
+// Etykieta kategorii z kolorową ikoną — używana na liście wydatków.
+function categoryBadge(idOrName, name) {
+    if (!name) return "-";
+    const { color, icon } = categoryStyle(idOrName != null ? idOrName : name);
+    return `<span class="inline-flex items-center gap-1.5 min-w-0">
+        <i class="fas ${escapeHtml(icon)} text-[11px] shrink-0" style="color:${escapeHtml(color)}"></i>
+        <span class="truncate">${escapeHtml(name)}</span>
+    </span>`;
+}
 
 // Zwraca HTML opcji <option> dla selecta kategorii (z opcją "dodaj nową" na końcu)
 function categoryOptionsHtml(selectedId = null, { includeEmpty = false } = {}) {
@@ -42,9 +115,17 @@ function logout() {
     localStorage.removeItem("token");
     currentUser = null;
     showView("login");
-    document.getElementById("navbar").classList.add("hidden");
+    setChromeVisible(false);
     document.getElementById("nav-admin-btn").classList.add("hidden");
     document.getElementById("nav-admin-btn-mobile").classList.add("hidden");
+}
+
+// Pokazuje/ukrywa oba paski nawigacji naraz i zdejmuje offset treści na loginie.
+function setChromeVisible(visible) {
+    document.getElementById("navbar").classList.toggle("is-hidden", !visible);
+    document.getElementById("navbar-mobile").classList.toggle("is-hidden", !visible);
+    document.getElementById("app-shell").classList.toggle("is-anon", !visible);
+    if (!visible) document.getElementById("mobile-menu").classList.add("hidden");
 }
 function toggleAuthMode() {
     document.getElementById("login-form").classList.toggle("hidden");
@@ -149,8 +230,16 @@ function showError(msg) {
 
 // ==================== NAVIGATION ====================
 function showView(viewName) {
+    const target = document.getElementById(`view-${viewName}`);
+    if (!target) return; // widok wyłączony flagą (cards / assets)
+
     document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-    document.getElementById(`view-${viewName}`).classList.add("active");
+    target.classList.add("active");
+
+    // Stan aktywny w nawigacji (sidebar + dolny pasek renderują te same data-view)
+    document.querySelectorAll("[data-view]").forEach((b) =>
+        b.classList.toggle("is-active", b.dataset.view === viewName)
+    );
 
     if (viewName === "dashboard") loadDashboard();
     if (viewName === "categories") loadCategories();
@@ -278,18 +367,18 @@ function renderExpenses(expenses) {
 
     // Desktop table
     tbody.innerHTML = expenses.map((e) => `
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="openExpenseModal(${e.id})">
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${e.date}</td>
-            <td class="px-4 py-3 text-sm text-gray-900">
+        <tr class="hover:bg-surface-2 cursor-pointer" onclick="openExpenseModal(${e.id})">
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${e.date}</td>
+            <td class="px-3 py-2 text-sm text-gray-900">
                 ${e.description || "-"}
                 ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-1 mt-1">${e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("")}</div>` : ""}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500">
-                ${e.category_name || "-"}
+            <td class="px-3 py-2 text-sm text-gray-500">
+                ${categoryBadge(e.category_id, e.category_name)}
                 ${e.card_name ? `<div class="mt-0.5"><span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full"><i class="fas fa-credit-card text-[10px]"></i>${escapeHtml(e.card_name)}</span></div>` : ""}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
-            <td class="px-4 py-3 text-center text-sm whitespace-nowrap">
+            <td class="px-3 py-2 text-sm text-gray-900 text-right font-medium">${e.amount.toFixed(2)} zł</td>
+            <td class="px-3 py-2 text-center text-sm whitespace-nowrap">
                 ${e.receipt_image_path ? `<button onclick="event.stopPropagation(); viewReceipt(${e.id})" class="text-gray-400 hover:text-gray-700 mr-2" title="Podgląd paragonu"><i class="fas fa-image"></i></button>` : ""}
                 <button onclick="event.stopPropagation(); openExpenseModal(${e.id})" class="text-primary hover:text-blue-700 mr-2" title="Edytuj"><i class="fas fa-pen"></i></button>
                 <button onclick="event.stopPropagation(); deleteExpense(${e.id})" class="text-danger hover:text-red-700" title="Usuń"><i class="fas fa-trash"></i></button>
@@ -311,7 +400,9 @@ function renderExpenses(expenses) {
             <div class="flex justify-between items-start">
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-gray-900 truncate">${e.description || "Bez opisu"}</p>
-                    <p class="text-xs text-gray-500">${e.date} · ${e.category_name || "-"}</p>
+                    <p class="text-xs text-gray-500 flex items-center gap-1.5">
+                        <span>${e.date}</span><span>·</span>${categoryBadge(e.category_id, e.category_name)}
+                    </p>
                     <div class="flex flex-wrap gap-1 mt-1">
                         ${e.card_name ? `<span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full"><i class="fas fa-credit-card text-[10px]"></i>${escapeHtml(e.card_name)}</span>` : ""}
                         ${e.tags && e.tags.length ? e.tags.map(t => `<span class="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">#${escapeHtml(t.name)}</span>`).join("") : ""}
@@ -988,10 +1079,18 @@ async function loadCategories() {
         const tbody = document.getElementById("categories-list");
         tbody.innerHTML = cats.map((c) => `
             <tr id="cat-row-${c.id}">
-                <td class="px-4 py-3 text-sm text-gray-900" id="cat-name-${c.id}">${escapeHtml(c.name)}</td>
-                <td class="px-4 py-3 text-right text-sm whitespace-nowrap">
+                <td class="px-3 py-2 text-sm text-gray-900" id="cat-name-${c.id}">
+                    <span class="inline-flex items-center gap-2">
+                        <span class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                            style="background:${escapeHtml(c.color || "#9aa8c2")}1f; color:${escapeHtml(c.color || "#9aa8c2")}">
+                            <i class="fas ${escapeHtml(c.icon || "fa-tag")} text-xs"></i>
+                        </span>
+                        <span>${escapeHtml(c.name)}</span>
+                    </span>
+                </td>
+                <td class="px-3 py-2 text-right text-sm whitespace-nowrap">
                     ${c.user_id ? `
-                        <button onclick="startRenameCategory(${c.id}, '${escapeHtml(c.name)}')" class="text-gray-400 hover:text-primary mr-3" title="Zmień nazwę"><i class="fas fa-pen text-xs"></i></button>
+                        <button onclick="startEditCategory(${c.id})" class="text-gray-400 hover:text-primary mr-3" title="Edytuj"><i class="fas fa-pen text-xs"></i></button>
                         <button onclick="deleteCategory(${c.id})" class="text-gray-400 hover:text-danger" title="Usuń"><i class="fas fa-trash text-xs"></i></button>
                     ` : '<span class="text-gray-400 text-xs">globalna</span>'}
                 </td>
@@ -1111,28 +1210,79 @@ async function deleteCategory(id) {
     }
 }
 
-function startRenameCategory(id, currentName) {
-    const nameTd = document.getElementById(`cat-name-${id}`);
-    nameTd.innerHTML = `
-        <form onsubmit="submitRenameCategory(event, ${id})" class="flex items-center gap-2">
-            <input type="text" value="${escapeHtml(currentName)}" id="cat-rename-${id}"
-                class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-48"
+// Ikony do wyboru przy kategorii — typowe koszyki wydatków domowych.
+const CATEGORY_ICONS = [
+    "fa-tag", "fa-cart-shopping", "fa-utensils", "fa-gas-pump", "fa-car",
+    "fa-house", "fa-bolt", "fa-wifi", "fa-mobile-screen", "fa-film",
+    "fa-gamepad", "fa-plane", "fa-train", "fa-shirt", "fa-heart-pulse",
+    "fa-pills", "fa-dumbbell", "fa-graduation-cap", "fa-book", "fa-gift",
+    "fa-paw", "fa-baby", "fa-screwdriver-wrench", "fa-scissors",
+    "fa-mug-hot", "fa-beer-mug-empty", "fa-basket-shopping", "fa-piggy-bank",
+    "fa-plug", "fa-cookie-bite", "fa-building-columns", "fa-shapes",
+    "fa-hand-holding-heart",
+];
+
+// Renderuje siatkę swatchy kolorów / ikon z zaznaczonym bieżącym wyborem.
+function _pickerGrid(kind, id, values, current) {
+    return values.map((v) => {
+        const active = v === current;
+        const ring = active ? "ring-2 ring-accent" : "ring-1 ring-gray-300";
+        return kind === "color"
+            ? `<button type="button" data-val="${v}" onclick="_pickCategory('${kind}', ${id}, '${v}')"
+                 class="cat-swatch w-6 h-6 rounded-full ${ring}" style="background:${v}"></button>`
+            : `<button type="button" data-val="${v}" onclick="_pickCategory('${kind}', ${id}, '${v}')"
+                 class="cat-swatch w-7 h-7 rounded-lg ${ring} flex items-center justify-center text-gray-700 hover:text-primary">
+                 <i class="fas ${v} text-xs"></i></button>`;
+    }).join("");
+}
+
+// Zaznacza wybór w siatce i zapamiętuje go na kontenerze formularza.
+function _pickCategory(kind, id, value) {
+    const form = document.getElementById(`cat-edit-${id}`);
+    form.dataset[kind] = value;
+    form.querySelectorAll(`[data-picker="${kind}"] .cat-swatch`).forEach((b) => {
+        const on = b.dataset.val === value;
+        b.classList.toggle("ring-2", on);
+        b.classList.toggle("ring-accent", on);
+        b.classList.toggle("ring-1", !on);
+        b.classList.toggle("ring-gray-300", !on);
+    });
+}
+
+function startEditCategory(id) {
+    const cat = categoriesCache.find((c) => c.id === id);
+    if (!cat) return;
+    const color = cat.color || CHART_PALETTE[0];
+    const icon = cat.icon || "fa-tag";
+    document.getElementById(`cat-name-${id}`).innerHTML = `
+        <form id="cat-edit-${id}" data-color="${color}" data-icon="${icon}"
+            onsubmit="submitEditCategory(event, ${id})" class="space-y-2 py-1">
+            <input type="text" value="${escapeHtml(cat.name)}" id="cat-rename-${id}"
+                class="w-full max-w-xs border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 onkeydown="if(event.key==='Escape') loadCategories()" />
-            <button type="submit" class="text-success hover:text-green-700 text-xs"><i class="fas fa-check"></i></button>
-            <button type="button" onclick="loadCategories()" class="text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+            <div data-picker="color" class="flex flex-wrap gap-1.5">${_pickerGrid("color", id, CHART_PALETTE, color)}</div>
+            <div data-picker="icon" class="flex flex-wrap gap-1.5">${_pickerGrid("icon", id, CATEGORY_ICONS, icon)}</div>
+            <div class="flex items-center gap-2 pt-0.5">
+                <button type="submit" class="px-3 py-1 rounded-lg bg-success-solid text-white text-xs font-semibold hover:bg-success-solid-hover">Zapisz</button>
+                <button type="button" onclick="loadCategories()" class="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 text-xs hover:bg-surface-2">Anuluj</button>
+            </div>
         </form>`;
     document.getElementById(`cat-rename-${id}`).focus();
 }
 
-async function submitRenameCategory(event, id) {
+async function submitEditCategory(event, id) {
     event.preventDefault();
-    const input = document.getElementById(`cat-rename-${id}`);
-    const newName = input.value.trim();
+    const form = document.getElementById(`cat-edit-${id}`);
+    const newName = document.getElementById(`cat-rename-${id}`).value.trim();
     if (!newName) return;
     try {
-        await apiRequest("PUT", `/categories/${id}`, { name: newName });
+        await apiRequest("PUT", `/categories/${id}`, {
+            name: newName,
+            color: form.dataset.color,
+            icon: form.dataset.icon,
+        });
         loadCategories();
-        showToast("Nazwa kategorii zmieniona", "success");
+        showToast("Kategoria zaktualizowana", "success");
     } catch (e) {
         showToast(e.message, "error");
     }
@@ -1169,12 +1319,12 @@ async function loadSubscriptions() {
             tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak abonamentów</td></tr>';
         } else {
             tbody.innerHTML = subs.map((s) => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm text-gray-900 font-medium">${escapeHtml(s.name)}</td>
-                    <td class="px-4 py-3 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
-                    <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">${subCycleLabel(s)}</td>
-                    <td class="px-4 py-3 text-sm text-gray-500">${s.next_billing_date}</td>
-                    <td class="px-4 py-3 text-right text-sm">
+                <tr class="hover:bg-surface-2">
+                    <td class="px-3 py-2 text-sm text-gray-900 font-medium">${escapeHtml(s.name)}</td>
+                    <td class="px-3 py-2 text-sm text-gray-900 text-right">${s.amount.toFixed(2)} zł</td>
+                    <td class="px-3 py-2 text-sm text-gray-500 hidden sm:table-cell">${subCycleLabel(s)}</td>
+                    <td class="px-3 py-2 text-sm text-gray-500">${s.next_billing_date}</td>
+                    <td class="px-3 py-2 text-right text-sm">
                         <button onclick="openSubModal(${s.id})" class="text-primary hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
                         <button onclick="deleteSubscription(${s.id})" class="text-danger hover:text-red-700"><i class="fas fa-trash"></i></button>
                     </td>
@@ -1330,6 +1480,7 @@ let dailyChart = null;
 let tagMonthlyChart = null;
 
 async function loadStats() {
+    await ensureCategoriesCache(); // kolory wykresu pochodzą z kategorii
     const now = new Date();
 
     // Default: last 12 months
@@ -1382,7 +1533,15 @@ async function loadStats() {
                 labels: data.category_summary.map((c) => c.category_name || "Bez kategorii"),
                 datasets: [{
                     data: data.category_summary.map((c) => c.total_amount),
-                    backgroundColor: ["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16"],
+                    // Kolor bierzemy z kategorii w bazie — wcześniej szedł po indeksie
+                    // tablicy, więc zmieniał się przy każdej zmianie kolejności.
+                    backgroundColor: data.category_summary.map(
+                        (c, i) =>
+                            categoryStyle(c.category_id != null ? c.category_id : c.category_name).color ||
+                            CHART_PALETTE[i % CHART_PALETTE.length]
+                    ),
+                    borderColor: themeColor("surface"),
+                    borderWidth: 2,
                 }],
             },
             options: {
@@ -1403,8 +1562,8 @@ async function loadStats() {
                 datasets: [{
                     label: "Kwota (zł)",
                     data: sorted.map((m) => m.total_amount),
-                    backgroundColor: "rgba(59, 130, 246, 0.7)",
-                    borderColor: "#3b82f6",
+                    backgroundColor: themeColor("primary", 0.55),
+                    borderColor: themeColor("primary"),
                     borderWidth: 1,
                 }],
             },
@@ -1432,12 +1591,12 @@ function renderMonthlyTable(monthlySummary) {
         <tr class="month-row cursor-pointer hover:bg-blue-50 transition-colors"
             data-year="${m.year}" data-month="${m.month}"
             onclick="toggleMonthDetails(${m.year}, ${m.month}, this)">
-            <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+            <td class="px-3 py-2 text-sm text-gray-900 font-medium">
                 <i class="fas fa-chevron-right text-gray-400 mr-2 expand-icon transition-transform duration-200"></i>
                 ${m.month_name} ${m.year}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-900 text-right font-semibold">${m.total_amount.toFixed(2)} zł</td>
-            <td class="px-4 py-3 text-sm text-gray-500 text-right">${m.expense_count}</td>
+            <td class="px-3 py-2 text-sm text-gray-900 text-right font-semibold">${m.total_amount.toFixed(2)} zł</td>
+            <td class="px-3 py-2 text-sm text-gray-500 text-right">${m.expense_count}</td>
         </tr>
     `).join("");
 }
@@ -1478,11 +1637,13 @@ async function toggleMonthDetails(year, month, rowEl) {
                     ${cats.map((c) => {
                         const catId = c.category_id || "null";
                         const catName = c.category_name || "Bez kategorii";
+                        const { color, icon } = categoryStyle(c.category_id != null ? c.category_id : catName);
                         return `<tr class="cat-row cursor-pointer hover:bg-blue-100 transition-colors"
                                     onclick="toggleCategoryExpenses('${key}-${catId}', '${key}', ${c.category_id || "null"}, '${start}', '${end}', this)">
                                     <td class="pl-10 pr-4 py-2 text-sm text-gray-700">
                                         <i class="fas fa-chevron-right text-gray-400 mr-2 expand-icon transition-transform duration-200"></i>
-                                        ${catName}
+                                        <i class="fas ${escapeHtml(icon)} text-[11px] mr-1.5" style="color:${escapeHtml(color)}"></i>
+                                        ${escapeHtml(catName)}
                                     </td>
                                     <td class="px-4 py-2 text-sm text-gray-800 text-right font-medium">${c.total_amount.toFixed(2)} zł</td>
                                     <td class="px-4 py-2 text-sm text-gray-500 text-right">${c.expense_count}</td>
@@ -1506,14 +1667,12 @@ async function toggleCategoryExpenses(cacheKey, monthKey, categoryId, start, end
 
     if (!_categoryExpenseCache[cacheKey]) {
         try {
-            let url;
-            if (categoryId === null || categoryId === "null") {
-                // Fetch all for the month, then filter uncategorized client-side
-                const all = await apiRequest("GET", `/expenses/?start_date=${start}&end_date=${end}&limit=500`);
-                _categoryExpenseCache[cacheKey] = all.filter(e => !e.category_id);
-            } else {
-                _categoryExpenseCache[cacheKey] = await apiRequest("GET", `/expenses/?start_date=${start}&end_date=${end}&category_id=${categoryId}&limit=500`);
-            }
+            // Ten endpoint jest item-aware: pokaże też paragon z inną kategorią
+            // nagłówka, jeśli zawiera pozycje z tej kategorii — i poda wtedy tylko
+            // kwotę tych pozycji. Zwykłe /expenses/?category_id= by go pominęło.
+            let url = `/stats/category-expenses?start_date=${start}&end_date=${end}`;
+            if (categoryId !== null && categoryId !== "null") url += `&category_id=${categoryId}`;
+            _categoryExpenseCache[cacheKey] = await apiRequest("GET", url);
         } catch (e) {
             showToast(e.message, "error");
             rowEl.querySelector(".expand-icon").style.transform = "";
@@ -1531,14 +1690,27 @@ async function toggleCategoryExpenses(cacheKey, monthKey, categoryId, start, end
     } else {
         detailRow.innerHTML = `
             <td colspan="3" class="px-0 py-0">
-                <table class="min-w-full bg-white">
+                <table class="min-w-full bg-surface">
                     <tbody>
                         ${expenses.map(e => `
-                            <tr class="hover:bg-gray-50">
-                                <td class="pl-16 pr-4 py-1.5 text-xs text-gray-600">${e.date} — ${e.description || "—"}</td>
-                                <td class="px-4 py-1.5 text-xs text-gray-800 text-right font-medium">${e.amount.toFixed(2)} zł</td>
-                                <td class="px-4 py-1.5 text-xs text-gray-400 text-right">
-                                    <button onclick="event.stopPropagation(); openExpenseModal(${e.id})" class="text-primary hover:underline">edytuj</button>
+                            <tr class="hover:bg-surface-2">
+                                <td class="pl-16 pr-4 py-1.5 text-xs text-gray-600">
+                                    ${e.date} — ${escapeHtml(e.description || "—")}
+                                    ${e.is_partial ? `
+                                    <span class="ml-1 text-[10px] text-gray-400" title="Paragon obejmuje też pozycje z innych kategorii">
+                                        (część z ${e.full_amount.toFixed(2)} zł)
+                                    </span>
+                                    <div class="mt-0.5 pl-2 border-l border-gray-200 space-y-0.5">
+                                        ${e.items.map(it => `
+                                        <div class="flex justify-between gap-3 text-[11px] text-gray-500 max-w-md">
+                                            <span class="truncate">${it.quantity}× ${escapeHtml(it.name)}</span>
+                                            <span class="shrink-0">${it.total.toFixed(2)} zł</span>
+                                        </div>`).join("")}
+                                    </div>` : ""}
+                                </td>
+                                <td class="px-4 py-1.5 text-xs text-gray-800 text-right font-medium align-top">${e.amount.toFixed(2)} zł</td>
+                                <td class="px-4 py-1.5 text-xs text-gray-400 text-right align-top">
+                                    <button onclick="event.stopPropagation(); openExpenseModal(${e.expense_id})" class="text-primary hover:underline">edytuj</button>
                                 </td>
                             </tr>`).join("")}
                     </tbody>
@@ -1580,13 +1752,15 @@ async function exportCSV() {
 function showToast(message, type = "info") {
     const container = document.getElementById("toast-container");
     const toast = document.createElement("div");
-    const colors = {
-        success: "bg-green-500",
-        error: "bg-red-500",
-        warning: "bg-yellow-500",
-        info: "bg-blue-500",
+    // Kolor tekstu jest jawny per wariant — na neonowych tłach biały tekst
+    // ma zbyt niski kontrast (bg-warning + text-white to ~1.9:1).
+    const styles = {
+        success: "bg-success text-gray-50",
+        error: "bg-danger text-gray-50",
+        warning: "bg-warning text-gray-50",
+        info: "bg-primary text-gray-50",
     };
-    toast.className = `${colors[type] || colors.info} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 fade-in`;
+    toast.className = `${styles[type] || styles.info} px-4 py-2 rounded-lg shadow-lg font-medium flex items-center gap-2 fade-in`;
     toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
@@ -1601,7 +1775,7 @@ function escapeHtml(text) {
 
 // ==================== INIT ====================
 async function initApp() {
-    document.getElementById("navbar").classList.remove("hidden");
+    setChromeVisible(true);
     try {
         currentUser = await apiRequest("GET", "/auth/me");
         if (currentUser.is_admin) {
@@ -1665,14 +1839,14 @@ async function loadTagsView() {
     empty.classList.add("hidden");
 
     tbody.innerHTML = _tagStatsCache.map(t => `
-        <tr class="hover:bg-gray-50" id="tag-row-${t.id}">
-            <td class="px-4 py-3 text-sm font-medium">
+        <tr class="hover:bg-surface-2" id="tag-row-${t.id}">
+            <td class="px-3 py-2 text-sm font-medium">
                 <button onclick="openTagDetail('${escapeHtml(t.name)}')"
                     class="text-primary hover:underline font-medium">#${escapeHtml(t.name)}</button>
             </td>
-            <td class="px-4 py-3 text-sm text-gray-600 text-right">${t.expense_count}</td>
-            <td class="px-4 py-3 text-sm text-gray-900 font-medium text-right">${t.total_amount.toFixed(2)} zł</td>
-            <td class="px-4 py-3 text-right whitespace-nowrap">
+            <td class="px-3 py-2 text-sm text-gray-600 text-right">${t.expense_count}</td>
+            <td class="px-3 py-2 text-sm text-gray-900 font-medium text-right">${t.total_amount.toFixed(2)} zł</td>
+            <td class="px-3 py-2 text-right whitespace-nowrap">
                 <button onclick="startRenameTag(${t.id}, '${escapeHtml(t.name)}')"
                     class="text-gray-400 hover:text-primary mr-3" title="Zmień nazwę">
                     <i class="fas fa-pen text-xs"></i>
@@ -1762,7 +1936,7 @@ async function openTagDetail(tagName) {
         <div class="flex items-center gap-3">
             <span class="text-sm text-gray-600 w-32 truncate shrink-0">${escapeHtml(name)}</span>
             <div class="flex-1 bg-gray-100 rounded-full h-2">
-                <div class="bg-primary h-2 rounded-full" style="width:${(amount / maxVal * 100).toFixed(1)}%"></div>
+                <div class="bg-primary-solid h-2 rounded-full" style="width:${(amount / maxVal * 100).toFixed(1)}%"></div>
             </div>
             <span class="text-sm font-medium text-gray-900 w-24 text-right shrink-0">${amount.toFixed(2)} zł</span>
         </div>
@@ -1773,7 +1947,7 @@ async function openTagDetail(tagName) {
 
     // Expense list
     document.getElementById("tag-detail-expenses").innerHTML = expenses.map(e => `
-        <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+        <div class="flex items-center justify-between px-4 py-3 hover:bg-surface-2">
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">${escapeHtml(e.description || "Bez opisu")}</p>
                 <p class="text-xs text-gray-500">${e.date} · ${e.category_name || "—"}</p>
@@ -1811,8 +1985,8 @@ function renderTagMonthlyChart(expenses) {
                 labels: months.map(m => m.label),
                 datasets: [{
                     data: months.map(m => m.total),
-                    backgroundColor: "rgba(59, 130, 246, 0.7)",
-                    borderColor: "#3b82f6",
+                    backgroundColor: themeColor("primary", 0.55),
+                    borderColor: themeColor("primary"),
                     borderWidth: 1,
                     borderRadius: 4,
                 }],
@@ -2089,7 +2263,7 @@ function renderCardsStats(stats) {
         const rulesDesc = buildRulesDescription(card);
 
         return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
                 <div>
                     <span class="font-semibold text-gray-800"><i class="fas fa-credit-card text-primary mr-2"></i>${card.name}</span>
@@ -2097,7 +2271,7 @@ function renderCardsStats(stats) {
                     ${rulesDesc ? `<span class="ml-3 text-xs text-gray-500">${rulesDesc}</span>` : ""}
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="openEditCardModal(${card.id})" class="text-gray-400 hover:text-primary text-sm px-2 py-1 rounded hover:bg-gray-100">
+                    <button onclick="openEditCardModal(${card.id})" class="text-gray-400 hover:text-primary text-sm px-2 py-1 rounded hover:bg-surface-2">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button onclick="deleteCard(${card.id}, '${card.name.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-red-500 text-sm px-2 py-1 rounded hover:bg-red-50">
@@ -2108,7 +2282,7 @@ function renderCardsStats(stats) {
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="text-left bg-white">
+                        <tr class="text-left bg-surface">
                             <th class="px-3 py-2 text-xs font-semibold text-gray-600 w-40">Warunek</th>
                             ${monthHeaders}
                         </tr>
@@ -2386,18 +2560,18 @@ function renderAssetsChart(summary) {
 
     const labels = summary.points.map(p => p.date);
     const accountIds = summary.accounts.map(a => String(a.id));
-    const accColors = ["#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#f97316","#64748b"];
+    const accColors = CHART_PALETTE.slice(1);
 
     // Total — gruba linia, wypełnienie gradientowe
     const totalData = summary.points.map(p => p.total);
     const gradient = ctx.getContext("2d").createLinearGradient(0, 0, 0, ctx.offsetHeight || 200);
-    gradient.addColorStop(0, "#3b82f622");
-    gradient.addColorStop(1, "#3b82f600");
+    gradient.addColorStop(0, themeColor("primary", 0.28));
+    gradient.addColorStop(1, themeColor("primary", 0));
 
     const totalDataset = {
         label: "Łącznie",
         data: totalData,
-        borderColor: "#3b82f6",
+        borderColor: themeColor("primary"),
         backgroundColor: gradient,
         borderWidth: 3,
         fill: true,
@@ -2448,7 +2622,7 @@ function renderAssetsChart(summary) {
                 x: { ticks: { font: { size: 10 } } },
                 y: {
                     ticks: { font: { size: 10 }, callback: v => _fmtAsset(v) },
-                    grid: { color: "#f1f5f9" },
+                    grid: { color: themeColor("border", 0.6) },
                 },
             },
         },
@@ -2483,7 +2657,7 @@ function renderAssetsAccounts(accounts) {
         ).join("");
 
         return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-4">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-primary">
@@ -2505,11 +2679,11 @@ function renderAssetsAccounts(accounts) {
           </div>` : ""}
           <div class="mt-3 flex gap-2">
             <button onclick="openAddSnapshotModal(${acc.id})"
-              class="px-3 py-1 bg-primary text-white text-xs rounded-md hover:bg-blue-700">
+              class="px-3 py-1 bg-primary-solid text-white text-xs rounded-md hover:bg-primary-solid-hover">
               <i class="fas fa-plus mr-1"></i>Dodaj wpis
             </button>
             <button onclick="deleteAssetAccount(${acc.id})"
-              class="px-3 py-1 border border-gray-300 text-gray-500 text-xs rounded-md hover:bg-gray-50">
+              class="px-3 py-1 border border-gray-300 text-gray-500 text-xs rounded-md hover:bg-surface-2">
               <i class="fas fa-trash mr-1"></i>Usuń konto
             </button>
           </div>

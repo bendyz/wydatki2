@@ -1,26 +1,26 @@
 <!-- Admin Panel View -->
 <div id="view-admin" class="view">
   <div class="max-w-3xl mx-auto px-4 py-8">
-    <div class="flex items-center mb-6">
+    <div class="flex items-center mb-4">
       <i class="fas fa-cog text-primary text-2xl mr-3"></i>
       <h1 class="text-2xl font-bold text-gray-900">Panel Administratora</h1>
     </div>
 
     <!-- Change password -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 flex items-center justify-between">
+    <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6 mb-4 flex items-center justify-between">
       <div>
         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
           <i class="fas fa-key text-primary mr-2"></i> Zmiana hasła
         </h2>
         <p class="text-xs text-gray-500 mt-1">Zmień hasło swojego konta.</p>
       </div>
-      <button onclick="openChangePasswordModal()" class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-blue-700">
+      <button onclick="openChangePasswordModal()" class="px-4 py-2 bg-primary-solid text-white text-sm font-medium rounded-md hover:bg-primary-solid-hover">
         <i class="fas fa-key mr-2"></i>Zmień hasło
       </button>
     </div>
 
     <!-- Users management -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-gray-800 flex items-center">
           <i class="fas fa-users text-primary mr-2"></i> Użytkownicy
@@ -39,7 +39,7 @@
               <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Akcje</th>
             </tr>
           </thead>
-          <tbody id="admin-users-list" class="divide-y divide-gray-200 bg-white">
+          <tbody id="admin-users-list" class="divide-y divide-gray-200 bg-surface">
             <tr><td colspan="6" class="px-4 py-4 text-center text-gray-400">Ładowanie...</td></tr>
           </tbody>
         </table>
@@ -49,7 +49,7 @@
     <form id="admin-config-form" onsubmit="saveAdminConfig(event)" class="space-y-6">
 
       <!-- Rejestracja -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-user-plus text-primary mr-2"></i> Rejestracja
         </h2>
@@ -61,7 +61,7 @@
       </div>
 
       <!-- Moduły -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-puzzle-piece text-primary mr-2"></i> Moduły
         </h2>
@@ -78,7 +78,7 @@
       </div>
 
       <!-- Ogólne -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-sliders-h text-primary mr-2"></i> Ogólne
         </h2>
@@ -95,7 +95,7 @@
       </div>
 
       <!-- Bezpieczeństwo -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-lock text-primary mr-2"></i> Bezpieczeństwo JWT
         </h2>
@@ -112,7 +112,7 @@
       </div>
 
       <!-- Serwer -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-server text-primary mr-2"></i> Serwer
         </h2>
@@ -129,7 +129,7 @@
       </div>
 
       <!-- AI / OpenRouter -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-robot text-primary mr-2"></i> AI — OpenRouter
         </h2>
@@ -166,7 +166,7 @@
       </div>
 
       <!-- Personalizacja AI -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-user-circle text-primary mr-2"></i> Personalizacja AI
         </h2>
@@ -180,7 +180,7 @@
       </div>
 
       <!-- Wykrywanie duplikatów -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <i class="fas fa-copy text-primary mr-2"></i> Wykrywanie duplikatów
         </h2>
@@ -202,7 +202,7 @@
       <div class="flex items-center justify-between">
         <span class="text-xs text-gray-400">Wersja aplikacji: <strong>v{{ app_version }}</strong></span>
         <button type="submit"
-          class="px-6 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+          class="px-6 py-2 bg-primary-solid text-white text-sm font-medium rounded-md hover:bg-primary-solid-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
           <i class="fas fa-save mr-2"></i>Zapisz konfigurację
         </button>
       </div>
