@@ -49,17 +49,37 @@
 
   <!-- Period Filter -->
   <div class="bg-surface rounded-xl shadow-sm border border-gray-200 mb-4 p-3 md:p-4">
-    <div class="flex flex-wrap gap-3 items-end">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-1">
+        <button onclick="shiftStatsPeriod(-1)" title="Poprzedni okres" aria-label="Poprzedni okres"
+          class="w-9 h-9 rounded-lg border border-gray-300 text-gray-600 hover:bg-surface-2 hover:text-primary">
+          <i class="fas fa-chevron-left text-xs"></i>
+        </button>
+        <div id="stats-period-label" class="min-w-[9.5rem] text-center text-sm font-semibold text-gray-900 px-1">-</div>
+        <button onclick="shiftStatsPeriod(1)" title="Następny okres" aria-label="Następny okres"
+          class="w-9 h-9 rounded-lg border border-gray-300 text-gray-600 hover:bg-surface-2 hover:text-primary">
+          <i class="fas fa-chevron-right text-xs"></i>
+        </button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <button onclick="setStatsPeriodMonth()" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-surface-2">Ten miesiąc</button>
+        <button onclick="setStatsPeriodYear()" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-surface-2">Ten rok</button>
+        <button onclick="toggleStatsRange()" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-surface-2">
+          <i class="fas fa-calendar-days mr-1"></i>Własny zakres
+        </button>
+      </div>
+    </div>
+    <div id="stats-range" class="hidden mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-3 items-end">
       <div class="flex-1 min-w-[140px]">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Od</label>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Od</label>
         <input type="date" id="stats-start" class="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
       <div class="flex-1 min-w-[140px]">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Do</label>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Do</label>
         <input type="date" id="stats-end" class="w-full border rounded-md px-3 py-2 text-sm" />
       </div>
       <button onclick="loadStats()" class="bg-primary-solid text-white px-4 py-2 rounded-md text-sm hover:bg-primary-solid-hover">
-        <i class="fas fa-sync mr-1"></i> Odśwież
+        <i class="fas fa-sync mr-1"></i> Zastosuj
       </button>
     </div>
   </div>
@@ -88,12 +108,16 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-5">
     <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
       <h3 class="text-base md:text-lg font-bold text-gray-900 mb-4">Wydatki per kategoria</h3>
-      <div class="relative h-64 md:h-80">
-        <canvas id="chart-categories"></canvas>
+      <!-- Wysokość wewnętrznego diva ustawia loadStats() — rośnie z liczbą
+           kategorii, a nadmiar przewija się wewnątrz karty. -->
+      <div class="relative h-64 md:h-80 overflow-y-auto pr-1">
+        <div id="chart-categories-wrap" class="relative h-full">
+          <canvas id="chart-categories"></canvas>
+        </div>
       </div>
     </div>
     <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-      <h3 class="text-base md:text-lg font-bold text-gray-900 mb-4">Wydatki miesięcznie</h3>
+      <h3 id="chart-daily-title" class="text-base md:text-lg font-bold text-gray-900 mb-4">Wydatki miesięcznie</h3>
       <div class="relative h-64 md:h-80">
         <canvas id="chart-daily"></canvas>
       </div>
@@ -102,7 +126,16 @@
 
   <!-- Monthly Table -->
   <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <h3 class="text-base md:text-lg font-bold text-gray-900 px-4 md:px-6 py-4 border-b">Podsumowanie miesięczne</h3>
+    <div class="flex items-center justify-between gap-3 px-4 md:px-6 py-3 border-b">
+      <h3 class="text-base md:text-lg font-bold text-gray-900">Podsumowanie miesięczne</h3>
+      <!-- Niezależne od filtra okresu — zawsze ostatnie N miesięcy. -->
+      <select id="stats-months-count" onchange="loadMonthlySummary()"
+        class="border rounded-md px-2 py-1 text-xs text-gray-700">
+        <option value="6">6 miesięcy</option>
+        <option value="12">12 miesięcy</option>
+        <option value="24">24 miesiące</option>
+      </select>
+    </div>
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">

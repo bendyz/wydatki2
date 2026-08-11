@@ -1,6 +1,8 @@
 import hashlib
+import unicodedata
 from typing import List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import Category
@@ -23,6 +25,20 @@ CATEGORY_PALETTE = [
 ]
 
 DEFAULT_CATEGORY_ICON = "fa-tag"
+
+
+def name_sort_key(name: Optional[str]) -> tuple:
+    """
+    Klucz sortowania alfabetycznego dla polskich nazw.
+
+    SQLite sortuje bajtowo, więc "Łazienka" wylądowałaby za "Zwierzęta",
+    a "auto" za "Zdrowie". Rozkładamy znaki na bazowe litery (NFKD zdejmuje
+    ogonki i kreski), "ł" trzeba podmienić ręcznie, bo się nie rozkłada.
+    """
+    base = unicodedata.normalize("NFKD", name or "")
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    base = base.replace("ł", "l").replace("Ł", "L")
+    return (base.casefold(), (name or "").casefold())
 
 # Dobór domyślnej ikony po słowie kluczowym w nazwie kategorii.
 # Kolejność ma znaczenie — pierwsze trafienie wygrywa.
@@ -117,7 +133,7 @@ def get_categories(
         include_global: Czy dołączyć kategorie globalne
 
     Returns:
-        Lista obiektów Category
+        Lista obiektów Category posortowana alfabetycznie (po polsku)
     """
     query = db.query(Category).filter(
         (Category.user_id == user_id) | (Category.user_id.is_(None))
@@ -125,7 +141,11 @@ def get_categories(
         else Category.user_id == user_id
     )
 
-    categories = query.offset(skip).limit(limit).all()
+    # ORDER BY w SQL daje stabilną paginację; właściwe (polskie) sortowanie
+    # robimy niżej w Pythonie — SQLite nie ma collacji z ogonkami.
+    categories = (
+        query.order_by(func.lower(Category.name)).offset(skip).limit(limit).all()
+    )
 
     # Backfill dla kategorii sprzed migracji — dzięki temu każda kategoria ma
     # stabilny kolor i frontend nie musi mieć własnej logiki zastępczej.
@@ -138,7 +158,7 @@ def get_categories(
                 c.icon = default_icon_for(c.name)
         db.commit()
 
-    return categories
+    return sorted(categories, key=lambda c: name_sort_key(c.name))
 
 
 def create_category(

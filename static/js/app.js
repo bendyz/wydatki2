@@ -38,6 +38,79 @@ function applyChartTheme() {
 }
 applyChartTheme();
 
+// ---------- ikony Font Awesome na canvasie ----------
+// Chart.js rysuje tekst, nie HTML, więc ikona przy słupku musi być glifem
+// czcionki. Kod znaku czytamy z CSS (::before) zamiast trzymać własną mapę
+// "klasa -> unicode", która rozjeżdżałaby się przy aktualizacji FA.
+const _faGlyphCache = {};
+function faGlyph(iconClass) {
+    if (iconClass in _faGlyphCache) return _faGlyphCache[iconClass];
+    const probe = document.createElement("i");
+    probe.className = `fas ${iconClass}`;
+    probe.style.cssText = "position:absolute;left:-9999px;visibility:hidden";
+    document.body.appendChild(probe);
+    const style = getComputedStyle(probe, "::before");
+    const match = /^["'](.*)["']$/.exec((style.content || "").trim());
+    const result = match
+        ? { char: match[1], family: style.fontFamily, weight: style.fontWeight }
+        : null;
+    probe.remove();
+    _faGlyphCache[iconClass] = result;
+    return result;
+}
+
+// Rysuje ikonę kategorii między etykietą osi Y a słupkiem. Miejsce robi
+// `ticks.padding` w konfiguracji wykresu.
+const categoryIconsPlugin = {
+    id: "categoryIcons",
+    afterDatasetsDraw(chart, args, opts) {
+        const icons = (opts && opts.icons) || [];
+        const yScale = chart.scales.y;
+        if (!icons.length || !yScale) return;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        icons.forEach((item, i) => {
+            const glyph = item && item.glyph;
+            if (!glyph) return;
+            ctx.font = `${glyph.weight} 13px ${glyph.family}`;
+            ctx.fillStyle = item.color;
+            ctx.fillText(glyph.char, yScale.right - 4, yScale.getPixelForValue(i));
+        });
+        ctx.restore();
+    },
+};
+
+// Kwota na końcu słupka. Wykres kategorii bywa wyższy niż karta i przewija się
+// w środku, więc oś X ucieka z pola widzenia — bez tych podpisów przy dolnych
+// słupkach nie dałoby się odczytać wartości. Miejsce robi `layout.padding`.
+const barValuesPlugin = {
+    id: "barValues",
+    afterDatasetsDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        const values = chart.data.datasets[0].data;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = "11px " + Chart.defaults.font.family;
+        ctx.fillStyle = themeColor("text-muted");
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        meta.data.forEach((bar, i) => {
+            ctx.fillText(fmtPln(values[i]), bar.x + 6, bar.y);
+        });
+        ctx.restore();
+    },
+};
+
+// Kwoty na wykresach: grosze tylko przy niepełnych, małych kwotach, spacja jako
+// separator tysięcy (przy 20 tys. "20000.00 zł" jest nieczytelne).
+function fmtPln(v) {
+    const n = Number(v) || 0;
+    const s = n % 1 === 0 || n >= 100 ? Math.round(n).toString() : n.toFixed(2);
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " zł";
+}
+
 // ---------- przełącznik jasny / ciemny ----------
 // Atrybut data-theme ustawia blokujący skrypt w base.html (przed pierwszym
 // paintem). Tutaj tylko go zmieniamy i odświeżamy to, co nie reaguje na CSS.
@@ -1536,20 +1609,113 @@ let categoryChart = null;
 let dailyChart = null;
 let tagMonthlyChart = null;
 
+const PL_MONTHS = [
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień",
+];
+
+// ---------- okres w statystykach ----------
+// Wszystko liczymy na datach lokalnych; toISOString() potrafi cofnąć o dobę
+// (strefa +02:00 → 1. dzień miesiąca staje się ostatnim dniem poprzedniego).
+function isoDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function parseIsoDate(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function lastDayOfMonth(year, month) {
+    return new Date(year, month + 1, 0);
+}
+function plDate(d) {
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+function statsRange() {
+    return {
+        start: parseIsoDate(document.getElementById("stats-start").value),
+        end: parseIsoDate(document.getElementById("stats-end").value),
+    };
+}
+function setStatsRange(start, end) {
+    document.getElementById("stats-start").value = isoDate(start);
+    document.getElementById("stats-end").value = isoDate(end);
+    loadStats();
+}
+function isWholeMonth(s, e) {
+    return !!s && !!e && s.getDate() === 1
+        && s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()
+        && e.getDate() === lastDayOfMonth(e.getFullYear(), e.getMonth()).getDate();
+}
+function isWholeYear(s, e) {
+    return !!s && !!e && s.getFullYear() === e.getFullYear()
+        && s.getMonth() === 0 && s.getDate() === 1
+        && e.getMonth() === 11 && e.getDate() === 31;
+}
+
+function setStatsPeriodMonth(year, month) {
+    const now = new Date();
+    const y = year === undefined ? now.getFullYear() : year;
+    const m = month === undefined ? now.getMonth() : month;
+    setStatsRange(new Date(y, m, 1), lastDayOfMonth(y, m));
+}
+function setStatsPeriodYear(year) {
+    const y = year === undefined ? new Date().getFullYear() : year;
+    setStatsRange(new Date(y, 0, 1), new Date(y, 11, 31));
+}
+
+// Strzałki przesuwają o "jeden taki sam okres": pełny miesiąc o miesiąc,
+// pełny rok o rok, a dowolny inny zakres o własną długość w dniach.
+function shiftStatsPeriod(delta) {
+    const { start, end } = statsRange();
+    if (!start || !end) return setStatsPeriodMonth();
+    if (isWholeYear(start, end)) return setStatsPeriodYear(start.getFullYear() + delta);
+    if (isWholeMonth(start, end)) {
+        const d = new Date(start.getFullYear(), start.getMonth() + delta, 1);
+        return setStatsPeriodMonth(d.getFullYear(), d.getMonth());
+    }
+    const days = Math.round((end - start) / 86400000) + 1;
+    setStatsRange(
+        new Date(start.getFullYear(), start.getMonth(), start.getDate() + delta * days),
+        new Date(end.getFullYear(), end.getMonth(), end.getDate() + delta * days)
+    );
+}
+
+function updateStatsPeriodLabel() {
+    const label = document.getElementById("stats-period-label");
+    if (!label) return;
+    const { start, end } = statsRange();
+    if (!start || !end) {
+        label.textContent = "-";
+        return;
+    }
+    if (isWholeYear(start, end)) {
+        label.textContent = `Rok ${start.getFullYear()}`;
+    } else if (isWholeMonth(start, end)) {
+        label.textContent = `${PL_MONTHS[start.getMonth()]} ${start.getFullYear()}`;
+    } else {
+        label.textContent = `${plDate(start)} – ${plDate(end)}`;
+        // Nietypowy zakres zostawiamy rozwinięty — inaczej nie widać, skąd się wziął.
+        document.getElementById("stats-range").classList.remove("hidden");
+    }
+}
+
+function toggleStatsRange() {
+    document.getElementById("stats-range").classList.toggle("hidden");
+}
+
 async function loadStats() {
     await ensureCategoriesCache(); // kolory wykresu pochodzą z kategorii
     const now = new Date();
 
-    // Default: last 12 months
+    // Domyślnie bieżący miesiąc, od 1. do ostatniego dnia.
     const startEl = document.getElementById("stats-start");
     const endEl = document.getElementById("stats-end");
-    if (!startEl.value) {
-        const d = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-        startEl.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    if (!startEl.value || !endEl.value) {
+        startEl.value = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+        endEl.value = isoDate(lastDayOfMonth(now.getFullYear(), now.getMonth()));
     }
-    if (!endEl.value) {
-        endEl.value = now.toISOString().split("T")[0];
-    }
+    updateStatsPeriodLabel();
 
     const start = startEl.value;
     const end = endEl.value;
@@ -1558,17 +1724,17 @@ async function loadStats() {
     _monthCategoryCache = {};
     _categoryExpenseCache = {};
 
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthsSelect = document.getElementById("stats-months-count");
+    if (monthsSelect) monthsSelect.value = String(statsMonthsBack());
 
     try {
-        const [data, monthData, subs] = await Promise.all([
+        const [data, subs] = await Promise.all([
             apiRequest("GET", `/stats/?start_date=${start}&end_date=${end}`),
-            apiRequest("GET", `/stats/?start_date=${monthStart}`),
             apiRequest("GET", "/subscriptions/?active_only=true"),
+            loadMonthlySummary(), // wypełnia tabelę i kafelek "Ten miesiąc"
         ]);
 
         // Top quick cards
-        document.getElementById("stat-month-total").textContent = monthData.total_amount.toFixed(2) + " zł";
         document.getElementById("stat-count").textContent = data.total_count;
         document.getElementById("stat-subs").textContent = subs.length;
 
@@ -1578,50 +1744,131 @@ async function loadStats() {
         document.getElementById("stats-avg-day").textContent = (data.average_per_day || 0).toFixed(2) + " zł";
         document.getElementById("stats-avg-exp").textContent = data.average_per_expense.toFixed(2) + " zł";
 
-        // Monthly table (expandable)
-        renderMonthlyTable(data.monthly_summary);
+        // Wykres kategorii — poziome słupki. Kołowy przy 20+ kategoriach był
+        // nieczytelny (same wąskie wycinki i legenda na pół wykresu).
+        const cats = [...data.category_summary].sort((a, b) => b.total_amount - a.total_amount);
+        // Kolor i ikonę bierzemy z kategorii w bazie — wcześniej kolor szedł po
+        // indeksie tablicy, więc zmieniał się przy każdej zmianie kolejności.
+        const catStyles = cats.map((c, i) => {
+            const st = categoryStyle(c.category_id != null ? c.category_id : c.category_name);
+            return {
+                color: st.color || CHART_PALETTE[i % CHART_PALETTE.length],
+                glyph: faGlyph(st.icon),
+            };
+        });
 
-        // Category doughnut chart
+        // Wysokość rośnie z liczbą słupków; karta ma overflow-y, więc nadmiar
+        // się przewija zamiast ściskać słupki do niewidoczności. Przy kilku
+        // kategoriach wykres wypełnia kartę, żeby nie zostawiać pustego pola.
+        const catWrap = document.getElementById("chart-categories-wrap");
+        const neededHeight = cats.length * 26 + 24;
+        // Puste = klasa h-full, czyli dokładnie wysokość karty (także po zmianie
+        // rozmiaru okna). Piksele ustawiamy tylko wtedy, gdy trzeba przewijać.
+        catWrap.style.height =
+            neededHeight > catWrap.parentElement.clientHeight ? `${neededHeight}px` : "";
+        const catLabelMax = catWrap.clientWidth < 420 ? 16 : 30;
+
         const catCtx = document.getElementById("chart-categories").getContext("2d");
         if (categoryChart) categoryChart.destroy();
         categoryChart = new Chart(catCtx, {
-            type: "doughnut",
+            type: "bar",
             data: {
-                labels: data.category_summary.map((c) => c.category_name || "Bez kategorii"),
+                labels: cats.map((c) => c.category_name || "Bez kategorii"),
                 datasets: [{
-                    data: data.category_summary.map((c) => c.total_amount),
-                    // Kolor bierzemy z kategorii w bazie — wcześniej szedł po indeksie
-                    // tablicy, więc zmieniał się przy każdej zmianie kolejności.
-                    backgroundColor: data.category_summary.map(
-                        (c, i) =>
-                            categoryStyle(c.category_id != null ? c.category_id : c.category_name).color ||
-                            CHART_PALETTE[i % CHART_PALETTE.length]
-                    ),
-                    borderColor: themeColor("surface"),
-                    borderWidth: 2,
+                    data: cats.map((c) => c.total_amount),
+                    backgroundColor: catStyles.map((s) => s.color),
+                    borderRadius: 4,
+                    borderSkipped: false,
                 }],
             },
             options: {
+                indexAxis: "y",
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: "bottom" } },
+                // miejsce na kwotę dopisywaną za słupkiem
+                layout: { padding: { right: 62 } },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { callback: (v) => fmtPln(v) },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            autoSkip: false,
+                            padding: 22, // miejsce na ikonę rysowaną przez plugin
+                            font: { size: 11 },
+                            // Chart.js ucina za długie etykiety bez ostrzeżenia —
+                            // na wąskim ekranie skracamy je sami. Pełna nazwa
+                            // zostaje w danych, więc tooltip jej nie traci.
+                            callback: (v, i) => {
+                                const name = cats[i].category_name || "Bez kategorii";
+                                return name.length > catLabelMax
+                                    ? name.slice(0, catLabelMax - 1) + "…"
+                                    : name;
+                            },
+                        },
+                    },
+                },
+                plugins: {
+                    legend: { display: false },
+                    categoryIcons: { icons: catStyles },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) =>
+                                ` ${ctx.parsed.x.toFixed(2)} zł (${(cats[ctx.dataIndex].percentage || 0).toFixed(1)}%)`,
+                        },
+                    },
+                },
             },
+            plugins: [categoryIconsPlugin, barValuesPlugin],
         });
+        // Ikony to glify czcionki — gdyby FA nie był jeszcze wczytany przy
+        // pierwszym rysowaniu, zostałyby puste miejsca.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => categoryChart && categoryChart.draw());
+        }
 
-        // Monthly bar chart (sorted ascending)
-        const sorted = [...data.monthly_summary].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+        // Drugi wykres: przy krótkim okresie w rozbiciu na dni (podsumowanie
+        // miesięczne to wtedy jeden słupek), przy dłuższym — miesięcznie.
+        const startDate = parseIsoDate(start), endDate = parseIsoDate(end);
+        const spanDays = startDate && endDate
+            ? Math.round((endDate - startDate) / 86400000) + 1
+            : 999;
+        const byDay = spanDays <= 62;
+        let labels, values;
+        if (byDay) {
+            // API zwraca tylko dni z wydatkami — dziury trzeba dopełnić zerami,
+            // inaczej oś czasu się ściska i kłamie o rozkładzie.
+            const amounts = {};
+            (data.daily_expenses || []).forEach((d) => { amounts[d.date] = d.amount; });
+            labels = [];
+            values = [];
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                labels.push(String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0"));
+                values.push(amounts[isoDate(d)] || 0);
+            }
+        } else {
+            const sorted = [...data.monthly_summary].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+            labels = sorted.map((m) => `${m.month_name} ${m.year}`);
+            values = sorted.map((m) => m.total_amount);
+        }
+        document.getElementById("chart-daily-title").textContent =
+            byDay ? "Wydatki dziennie" : "Wydatki miesięcznie";
+
         const dailyCtx = document.getElementById("chart-daily").getContext("2d");
         if (dailyChart) dailyChart.destroy();
         dailyChart = new Chart(dailyCtx, {
             type: "bar",
             data: {
-                labels: sorted.map((m) => `${m.month_name} ${m.year}`),
+                labels,
                 datasets: [{
                     label: "Kwota (zł)",
-                    data: sorted.map((m) => m.total_amount),
+                    data: values,
                     backgroundColor: themeColor("primary", 0.55),
                     borderColor: themeColor("primary"),
                     borderWidth: 1,
+                    borderRadius: 3,
                 }],
             },
             options: {
@@ -1631,6 +1878,43 @@ async function loadStats() {
                 plugins: { legend: { display: false } },
             },
         });
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+// Tabela miesięczna celowo nie zależy od filtra okresu — pokazuje ostatnie N
+// miesięcy (6 / 12 / 24, wybór pamiętany w localStorage). Przy okazji wypełnia
+// kafelek "Ten miesiąc": bieżący miesiąc i tak jest w tych danych, więc nie ma
+// po co pytać bazy drugi raz.
+function statsMonthsBack() {
+    const v = parseInt(localStorage.getItem("statsMonths"), 10);
+    return [6, 12, 24].includes(v) ? v : 6;
+}
+
+async function loadMonthlySummary() {
+    const select = document.getElementById("stats-months-count");
+    const months = (select && parseInt(select.value, 10)) || statsMonthsBack();
+    try {
+        localStorage.setItem("statsMonths", String(months));
+    } catch (e) {
+        // tryb prywatny — wybór zadziała do końca sesji
+    }
+
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+    const to = lastDayOfMonth(now.getFullYear(), now.getMonth());
+    try {
+        const data = await apiRequest(
+            "GET",
+            `/stats/?start_date=${isoDate(from)}&end_date=${isoDate(to)}`
+        );
+        renderMonthlyTable(data.monthly_summary);
+        const current = data.monthly_summary.find(
+            (m) => m.year === now.getFullYear() && m.month === now.getMonth() + 1
+        );
+        document.getElementById("stat-month-total").textContent =
+            (current ? current.total_amount : 0).toFixed(2) + " zł";
     } catch (e) {
         showToast(e.message, "error");
     }
