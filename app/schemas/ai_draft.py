@@ -2,14 +2,18 @@ from datetime import date as DateType
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.expense import validate_price_not_zero
 
 
 class DraftExpenseItem(BaseModel):
     """Pozycja wydatku zaproponowana przez AI do weryfikacji użytkownika"""
 
     name: str = Field(..., description="Nazwa produktu/usługi rozpoznana przez AI")
-    price: float = Field(..., gt=0, description="Cena jednostkowa")
+    price: float = Field(
+        ..., description="Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+    )
     quantity: float = Field(default=1.0, gt=0, description="Ilość")
     category_id: Optional[int] = Field(
         None, description="Zaproponowane ID kategorii dla tej pozycji"
@@ -20,6 +24,8 @@ class DraftExpenseItem(BaseModel):
     confidence: Optional[float] = Field(
         None, ge=0, le=1, description="Pewność AI co do kategorii (0-1)"
     )
+
+    _validate_price = field_validator("price")(validate_price_not_zero)
 
 
 class DraftDuplicateWarning(BaseModel):

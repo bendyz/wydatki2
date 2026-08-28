@@ -80,11 +80,15 @@
           <div id="draft-items-section" class="hidden">
             <div class="flex items-center justify-between mb-2">
               <label class="block text-xs font-medium text-gray-500">Pozycje na paragonie</label>
+              <span id="draft-items-total" class="text-xs text-gray-500"></span>
             </div>
             <div id="draft-items-list" class="space-y-2"></div>
-            <button onclick="addDraftItem()" class="mt-2 text-sm text-primary hover:underline">
-              <i class="fas fa-plus mr-1"></i>Dodaj pozycję
-            </button>
+            <div class="mt-2 flex items-center justify-between gap-2">
+              <button onclick="addDraftItem()" class="text-sm text-primary hover:underline">
+                <i class="fas fa-plus mr-1"></i>Dodaj pozycję
+              </button>
+              <span class="text-xs text-gray-500">ujemna cena = rabat lub zwrot</span>
+            </div>
           </div>
         </div>
 

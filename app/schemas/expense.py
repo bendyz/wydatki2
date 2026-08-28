@@ -2,17 +2,28 @@ from datetime import date as DateType
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.tag import TagResponse
+
+
+def validate_price_not_zero(value: float) -> float:
+    """Cena pozycji może być ujemna (rabat, zwrot), ale nigdy zerowa."""
+    if value == 0:
+        raise ValueError("Cena nie może być zerem (ujemna oznacza rabat lub zwrot)")
+    return value
 
 
 class ExpenseItemBase(BaseModel):
     """Bazowy schemat pozycji wydatku (produkt na paragonie)"""
 
     name: str = Field(..., min_length=1, description="Nazwa produktu/usługi")
-    price: float = Field(..., gt=0, description="Cena jednostkowa")
+    price: float = Field(
+        ..., description="Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+    )
     quantity: float = Field(default=1.0, gt=0, description="Ilość")
+
+    _validate_price = field_validator("price")(validate_price_not_zero)
     category_id: Optional[int] = Field(
         None, description="ID kategorii dla tej konkretnej pozycji (opcjonalne)"
     )

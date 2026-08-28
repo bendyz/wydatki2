@@ -158,9 +158,12 @@
               <span id="modal-items-total" class="text-xs text-gray-500"></span>
             </div>
             <div id="modal-items-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
-            <button onclick="addModalItem()" class="mt-2 text-sm text-primary hover:underline">
-              <i class="fas fa-plus mr-1"></i>Dodaj pozycję
-            </button>
+            <div class="mt-2 flex items-center justify-between gap-2">
+              <button onclick="addModalItem()" class="text-sm text-primary hover:underline">
+                <i class="fas fa-plus mr-1"></i>Dodaj pozycję
+              </button>
+              <span class="text-xs text-gray-500">ujemna cena = rabat lub zwrot</span>
+            </div>
           </div>
           <!-- Tags -->
           <div>

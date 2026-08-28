@@ -885,30 +885,110 @@ function addModalItem() {
     updateModalItemsTotal();
 }
 
-function updateModalItemsTotal() {
+// --- Suma pozycji (wspólne dla modala edycji i draftu AI) ---
+// Pozycja może mieć ujemną cenę (rabat, zwrot części kosztu przez inną osobę),
+// więc suma bywa mniejsza od pojedynczej pozycji, a nawet ujemna.
+
+function sumItemsList(listId) {
     let total = 0;
-    document.querySelectorAll("#modal-items-list > div").forEach((div) => {
+    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
         const inputs = div.querySelectorAll("input");
-        const price = parseFloat(inputs[1]?.value || 0);
-        const qty = parseFloat(inputs[2]?.value || 1);
-        total += price * qty;
+        const price = parseFloat(inputs[1]?.value);
+        if (isNaN(price)) return;
+        const qty = parseFloat(inputs[2]?.value);
+        total += price * (isNaN(qty) ? 1 : qty);
     });
-    document.getElementById("modal-items-total").textContent = total > 0 ? `Suma pozycji: ${total.toFixed(2)} zł` : "";
+    return total;
 }
 
-async function saveExpenseModal() {
+// Podświetla ujemne ceny na czerwono, żeby zwrot dało się odróżnić od kosztu.
+function markNegativeItemPrices(listId) {
+    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
+        const priceInput = div.querySelectorAll("input")[1];
+        if (!priceInput) return;
+        priceInput.classList.toggle("text-danger", parseFloat(priceInput.value) < 0);
+    });
+}
+
+// Pokazuje sumę pozycji, a gdy różni się od kwoty wydatku — przycisk przeliczenia.
+function updateItemsTotal(listId, totalId, amountId) {
+    markNegativeItemPrices(listId);
+
+    const totalEl = document.getElementById(totalId);
+    if (!totalEl) return;
+    if (!document.querySelector(`#${listId} > div`)) {
+        totalEl.innerHTML = "";
+        return;
+    }
+
+    const total = sumItemsList(listId);
+    const label = `Suma pozycji: ${total.toFixed(2)} zł`;
+    const amount = parseFloat(document.getElementById(amountId).value);
+
+    if (isNaN(amount) || Math.abs(total - amount) <= 0.005) {
+        totalEl.innerHTML = escapeHtml(label);
+        return;
+    }
+    totalEl.innerHTML = `
+        <span class="text-warning">${escapeHtml(label)}</span>
+        <button type="button" onclick="applyItemsTotal('${listId}', '${amountId}')"
+            class="ml-2 text-primary hover:underline font-medium">Ustaw jako kwotę</button>`;
+}
+
+function applyItemsTotal(listId, amountId) {
+    document.getElementById(amountId).value = sumItemsList(listId).toFixed(2);
+    document.getElementById(amountId).dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function updateModalItemsTotal() {
+    updateItemsTotal("modal-items-list", "modal-items-total", "modal-amount");
+}
+
+function updateDraftItemsTotal() {
+    updateItemsTotal("draft-items-list", "draft-items-total", "draft-amount");
+}
+
+// Delegacja na document — listy pozycji są przebudowywane przez innerHTML,
+// a widoki podmieniane, więc listener wpięty w konkretny element by odpadł.
+document.addEventListener("input", (e) => {
+    if (e.target.closest("#modal-items-list") || e.target.id === "modal-amount") {
+        updateModalItemsTotal();
+    } else if (e.target.closest("#draft-items-list") || e.target.id === "draft-amount") {
+        updateDraftItemsTotal();
+    }
+});
+
+// Zbiera pozycje z listy. Zwraca null (i pokazuje toast), jeśli któraś ma
+// cenę zerową lub niepoprawną — backend odrzuciłby to komunikatem po angielsku.
+function collectItemsFromList(listId) {
     const items = [];
-    document.querySelectorAll("#modal-items-list > div").forEach((div) => {
+    let invalid = null;
+    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
         const inputs = div.querySelectorAll("input, select");
         const name = inputs[0].value.trim();
         if (!name) return;
+        const price = parseFloat(inputs[1].value);
+        if (isNaN(price) || price === 0) {
+            invalid = invalid || name;
+            return;
+        }
         items.push({
             name,
-            price: parseFloat(inputs[1].value) || 0,
+            price,
             quantity: parseFloat(inputs[2].value) || 1,
             category_id: inputs[3].value || null,
         });
     });
+    if (invalid) {
+        showToast(`Pozycja "${invalid}" musi mieć cenę różną od zera (ujemna = rabat/zwrot)`, "error");
+        return null;
+    }
+    return items;
+}
+
+async function saveExpenseModal() {
+    const items = collectItemsFromList("modal-items-list");
+    if (items === null) return;
 
     const modalCardEl = document.getElementById("modal-card");
     const data = {
@@ -1089,13 +1169,14 @@ function showDraft(draft) {
                     <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="draft-item-${i}-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
                         ${categoryOptionsHtml(item.category_id)}
                     </select>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
+                    <button onclick="this.parentElement.parentElement.remove(); updateDraftItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
                 </div>
             </div>
         `).join("");
     } else {
         document.getElementById("draft-items-section").classList.add("hidden");
     }
+    updateDraftItemsTotal();
 
     // Tags
     document.getElementById("draft-tags-container").innerHTML = "";
@@ -1133,25 +1214,16 @@ function addDraftItem() {
             <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
                 ${categoryOptionsHtml()}
             </select>
-            <button onclick="this.parentElement.parentElement.remove()" class="text-danger"><i class="fas fa-times"></i></button>
+            <button onclick="this.parentElement.parentElement.remove(); updateDraftItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
         </div>
     `;
     document.getElementById("draft-items-list").appendChild(div);
+    updateDraftItemsTotal();
 }
 
 async function saveDraftExpense() {
-    const items = [];
-    document.querySelectorAll("#draft-items-list > div").forEach((div) => {
-        const inputs = div.querySelectorAll("input, select");
-        const name = inputs[0].value.trim();
-        if (!name) return;
-        items.push({
-            name,
-            price: parseFloat(inputs[1].value) || 0,
-            quantity: parseFloat(inputs[2].value) || 1,
-            category_id: inputs[3].value || null,
-        });
-    });
+    const items = collectItemsFromList("draft-items-list");
+    if (items === null) return;
 
     const draftCardEl = document.getElementById("draft-card");
     const data = {
