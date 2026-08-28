@@ -986,13 +986,23 @@ function collectItemsFromList(listId) {
     return items;
 }
 
+// Kwota 0 to najczęściej literówka (np. "00" zamiast "100"), ale bywa
+// świadoma — pytamy zamiast blokować. API takiej kwoty nie odrzuca.
+function confirmZeroAmount(amount) {
+    if (amount !== 0) return true;
+    return confirm("Kwota wynosi 0,00 zł — czy na pewno o to chodziło?");
+}
+
 async function saveExpenseModal() {
     const items = collectItemsFromList("modal-items-list");
     if (items === null) return;
 
+    const modalAmount = parseFloat(document.getElementById("modal-amount").value);
+    if (!confirmZeroAmount(modalAmount)) return;
+
     const modalCardEl = document.getElementById("modal-card");
     const data = {
-        amount: parseFloat(document.getElementById("modal-amount").value),
+        amount: modalAmount,
         date: document.getElementById("modal-date").value,
         description: document.getElementById("modal-description").value,
         category_id: document.getElementById("modal-category").value || null,
@@ -1040,9 +1050,12 @@ function showExpenseTab(tab) {
 }
 
 async function addManualExpense() {
+    const manualAmount = parseFloat(document.getElementById("manual-amount").value);
+    if (!confirmZeroAmount(manualAmount)) return;
+
     const cardEl = document.getElementById("manual-card");
     const data = {
-        amount: parseFloat(document.getElementById("manual-amount").value),
+        amount: manualAmount,
         date: document.getElementById("manual-date").value,
         description: document.getElementById("manual-description").value,
         category_id: document.getElementById("manual-category").value || null,
@@ -1225,9 +1238,12 @@ async function saveDraftExpense() {
     const items = collectItemsFromList("draft-items-list");
     if (items === null) return;
 
+    const draftAmount = parseFloat(document.getElementById("draft-amount").value);
+    if (!confirmZeroAmount(draftAmount)) return;
+
     const draftCardEl = document.getElementById("draft-card");
     const data = {
-        amount: parseFloat(document.getElementById("draft-amount").value),
+        amount: draftAmount,
         date: document.getElementById("draft-date").value,
         description: document.getElementById("draft-description").value,
         category_id: document.getElementById("draft-category").value || null,

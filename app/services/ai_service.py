@@ -331,13 +331,26 @@ def _build_draft_from_parsed(
     valid_card_ids: Optional[set] = None,
 ) -> ExpenseDraft:
     """Buduje obiekt ExpenseDraft z sparsowanej odpowiedzi AI."""
+    # Pozycja bez czytelnej ceny nie może wywalić całego skanu — przy długim
+    # paragonie kosztowałoby to użytkownika wszystkie pozostałe linijki.
+    # Pomijamy ją i mówimy o tym wprost w user_hints.
     items = []
+    skipped = 0
     for item_data in parsed.get("items", []):
+        try:
+            price = float(item_data.get("price"))
+            quantity = float(item_data.get("quantity", 1))
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        if price == 0 or quantity <= 0:
+            skipped += 1
+            continue
         items.append(
             DraftExpenseItem(
                 name=item_data.get("name", "Nieznana pozycja"),
-                price=float(item_data.get("price", 0)),
-                quantity=float(item_data.get("quantity", 1)),
+                price=price,
+                quantity=quantity,
                 category_id=item_data.get("category_id"),
                 category_name=item_data.get("category_name"),
                 confidence=item_data.get("confidence"),
@@ -373,6 +386,13 @@ def _build_draft_from_parsed(
     raw_card_id = parsed.get("card_id")
     card_id = raw_card_id if (valid_card_ids and raw_card_id in valid_card_ids) else None
 
+    user_hints = list(parsed.get("user_hints", []))
+    if skipped:
+        noun = "pozycję" if skipped == 1 else "pozycje" if skipped < 5 else "pozycji"
+        user_hints.append(
+            f"Pominięto {skipped} {noun} bez czytelnej ceny — sprawdź paragon i dopisz ręcznie."
+        )
+
     return ExpenseDraft(
         amount=amount,
         description=parsed.get("description"),
@@ -387,7 +407,7 @@ def _build_draft_from_parsed(
         ai_model=ai_model,
         processing_time_ms=processing_time_ms,
         needs_review=parsed.get("needs_review", False) or len(items) == 0,
-        user_hints=parsed.get("user_hints", []),
+        user_hints=user_hints,
         suggested_tags=suggested_tags,
     )
 

@@ -3,7 +3,7 @@
   "info": {
     "title": "Wydatki 2.0",
     "description": "Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    "version": "0.5.3"
+    "version": "0.5.4"
   },
   "paths": {
     "/api/v1/auth/registration-status": {
@@ -3956,7 +3956,7 @@
           "price": {
             "type": "number",
             "title": "Price",
-            "description": "Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+            "description": "Cena jednostkowa (ujemna = rabat lub zwrot); pozycje bez czytelnej ceny są pomijane przy budowaniu draftu"
           },
           "quantity": {
             "type": "number",
@@ -4017,8 +4017,7 @@
           "amount": {
             "type": "number",
             "title": "Amount",
-            "description": "Całkowita kwota wydatku",
-            "ne": 0
+            "description": "Całkowita kwota wydatku"
           },
           "description": {
             "anyOf": [
@@ -4253,7 +4252,7 @@
           "price": {
             "type": "number",
             "title": "Price",
-            "description": "Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+            "description": "Cena jednostkowa (ujemna = rabat lub zwrot); przy zapisie nie może być zerem"
           },
           "quantity": {
             "type": "number",
@@ -4294,7 +4293,7 @@
           "price": {
             "type": "number",
             "title": "Price",
-            "description": "Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+            "description": "Cena jednostkowa (ujemna = rabat lub zwrot); przy zapisie nie może być zerem"
           },
           "quantity": {
             "type": "number",
@@ -4339,8 +4338,7 @@
           "amount": {
             "type": "number",
             "title": "Amount",
-            "description": "Całkowita kwota wydatku",
-            "ne": 0
+            "description": "Całkowita kwota wydatku"
           },
           "description": {
             "anyOf": [
@@ -4486,8 +4484,7 @@
                 "type": "null"
               }
             ],
-            "title": "Amount",
-            "ne": 0
+            "title": "Amount"
           },
           "description": {
             "anyOf": [

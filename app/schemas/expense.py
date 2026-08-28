@@ -19,11 +19,13 @@ class ExpenseItemBase(BaseModel):
 
     name: str = Field(..., min_length=1, description="Nazwa produktu/usługi")
     price: float = Field(
-        ..., description="Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+        ...,
+        description=(
+            "Cena jednostkowa (ujemna = rabat lub zwrot); "
+            "przy zapisie nie może być zerem"
+        ),
     )
     quantity: float = Field(default=1.0, gt=0, description="Ilość")
-
-    _validate_price = field_validator("price")(validate_price_not_zero)
     category_id: Optional[int] = Field(
         None, description="ID kategorii dla tej konkretnej pozycji (opcjonalne)"
     )
@@ -32,7 +34,9 @@ class ExpenseItemBase(BaseModel):
 class ExpenseItemCreate(ExpenseItemBase):
     """Schemat do tworzenia pozycji wydatku"""
 
-    pass
+    # Walidacja tylko na wejściu — ExpenseItemResponse dziedziczy z Base i musi
+    # umieć zwrócić każdy wiersz, jaki faktycznie leży w bazie.
+    _validate_price = field_validator("price")(validate_price_not_zero)
 
 
 class ExpenseItemResponse(ExpenseItemBase):
@@ -47,7 +51,9 @@ class ExpenseItemResponse(ExpenseItemBase):
 class ExpenseBase(BaseModel):
     """Bazowy schemat wydatku"""
 
-    amount: float = Field(..., ne=0, description="Całkowita kwota wydatku")
+    # Kwota 0 jest dozwolona przez API; o literówkę pyta GUI przed zapisem.
+    # (`ne=0` nie było tu constraintem Pydantic v2 — nic nie sprawdzało.)
+    amount: float = Field(..., description="Całkowita kwota wydatku")
     description: Optional[str] = Field(None, description="Opis lub nazwa sklepu")
     date: DateType = Field(..., description="Data wydatku")
     category_id: Optional[int] = Field(
@@ -67,7 +73,7 @@ class ExpenseCreate(ExpenseBase):
 class ExpenseUpdate(BaseModel):
     """Schemat do aktualizacji wydatku (wszystkie pola opcjonalne)"""
 
-    amount: Optional[float] = Field(None, ne=0)
+    amount: Optional[float] = None
     description: Optional[str] = None
     date: Optional[DateType] = None
     category_id: Optional[int] = None

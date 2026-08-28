@@ -12,7 +12,11 @@ class DraftExpenseItem(BaseModel):
 
     name: str = Field(..., description="Nazwa produktu/usługi rozpoznana przez AI")
     price: float = Field(
-        ..., description="Cena jednostkowa, różna od zera (ujemna = rabat lub zwrot)"
+        ...,
+        description=(
+            "Cena jednostkowa (ujemna = rabat lub zwrot); "
+            "pozycje bez czytelnej ceny są pomijane przy budowaniu draftu"
+        ),
     )
     quantity: float = Field(default=1.0, gt=0, description="Ilość")
     category_id: Optional[int] = Field(
