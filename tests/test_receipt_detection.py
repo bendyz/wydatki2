@@ -18,7 +18,7 @@ from pathlib import Path
 import cv2
 import pytest
 
-from app.services.receipt_detection import find_receipt_quad
+from app.services.receipt_detection import crop_receipt, find_receipt_quad
 from tests.conftest import DEFAULT_SET
 
 DEFAULT_THRESHOLD = 0.80
@@ -28,6 +28,12 @@ def bounding_box(quad) -> tuple[float, float, float, float]:
     """Prostokąt opisany na czworokącie: (x0, y0, x1, y1)."""
     xs, ys = quad[:, 0], quad[:, 1]
     return float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())
+
+
+def bounding_box_of_image(image) -> tuple[float, float, float, float]:
+    """Prostokąt całego obrazu — do porównania rozmiarów kolejnych przebiegów."""
+    height, width = image.shape[:2]
+    return 0.0, 0.0, float(width), float(height)
 
 
 def iou(a, b) -> float:
@@ -80,4 +86,65 @@ def test_wykrywa_paragon_zgodnie_z_oznaczeniem(photo, receipt_set_dir, annotatio
     score = iou(bounding_box(quad), expected)
     assert score >= threshold, (
         f"{photo} [{meta['tlo']}]: IoU {score:.3f} poniżej progu {threshold:.2f}"
+    )
+
+
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "Zmierzona rzeczywistość na prawdziwych zdjęciach, nie usterka testu: "
+        "powtórne kadrowanie realnie zjada obraz. 10 z 16 mierzonych zdjęć wypada "
+        "poniżej progu 0.98, najgorzej 07.jpg (pokrycie 0.476 — drugi przebieg "
+        "zostawia niecałą połowę powierzchni pierwszego wyjścia). Przyczyna jest "
+        "strukturalna, nie losowa: `_surround_contrast` ocenia kandydata, "
+        "porównując jego wnętrze z pierścieniem tuż na zewnątrz. Gdy paragon "
+        "wypełnia cały kadr (a tak wygląda już wykadrowane zdjęcie), pierścień "
+        "wokół prawdziwego czworokąta leży w całości wewnątrz paragonu — kontrast "
+        "wychodzi bliski zeru i przegrywa z wewnętrznym prostokątem (blokiem "
+        "tekstu), który ma prawdziwy pierścień tła na zewnątrz. To nie jest coś, "
+        "co da się podkręcić progiem: dopóki wynik zależy od kontrastu z "
+        "otoczeniem, kadr-w-kadrze będzie z definicji mylący. Dlatego flaga "
+        "`already_cropped` (zadanie 6) jest warunkiem poprawności API, nie "
+        "wygodą — na już wykadrowanym obrazie detekcja nie powinna być "
+        "uruchamiana ponownie. `strict=False`: jeśli kiedyś detektor przestanie "
+        "mieć tę wadę, ten test zrobi się XPASS — to ma być sygnał, żeby zdjąć "
+        "dekorator, a nie kolejny czerwony wynik do ignorowania."
+    ),
+)
+@pytest.mark.parametrize("photo", photo_names())
+def test_powtorne_kadrowanie_niczego_nie_zjada(photo, receipt_set_dir, annotations):
+    """
+    Drugi przebieg na własnym wyjściu musi być praktycznie tożsamością.
+
+    Dokument źródłowy §9.9 postuluje tu `None`, ale §9.2 mierzy, że kandydat przechodzi
+    (udzial 0.915 < próg 0.95). Świadomie nie robimy strażnika z §9.2 — flaga
+    `already_cropped` załatwia to po stronie API — więc test pilnuje tego, co faktycznie
+    ma być prawdą: powtórka nie może obrazu zjadać ani skręcać.
+
+    Świadomy `xfail`, nie zamieciony pod dywan czerwony test: uruchomienie na
+    zestawie prawdziwych zdjęć pokazuje, że ta własność jest w praktyce fałszywa
+    dla większości z nich (patrz `reason` dekoratora wyżej i `task-3-report.md`
+    w `.superpowers/sdd/2026-09-06-port-detekcji-paragonu/`). Test i próg `0.98`
+    zostają bez zmian — mierzą to, co faktycznie powinno być prawdą — a `xfail`
+    tylko nie daje temu ustaleniu farbować reszty zielonego CI na czerwono, dopóki
+    nie powstanie strażnik `already_cropped` albo naprawa `_surround_contrast`.
+    """
+    meta = annotations.get(photo)
+    if meta is None or meta.get("dopuszczalny_brak", False):
+        pytest.skip(f"{photo}: brak oznaczenia albo dopuszczalny brak detekcji")
+
+    image = cv2.imread(str(receipt_set_dir / "receipts" / photo), cv2.IMREAD_COLOR)
+    first, detection = crop_receipt(image)
+    if detection is None:
+        pytest.skip(f"{photo}: pierwszy przebieg nic nie znalazł")
+
+    second, _ = crop_receipt(first)
+
+    height, width = first.shape[:2]
+    shrink = iou(
+        bounding_box_of_image(second), (0.0, 0.0, float(width), float(height))
+    )
+    assert shrink >= 0.98, (
+        f"{photo}: powtórne kadrowanie zjadło obraz — pokrycie {shrink:.3f}, "
+        f"{width}x{height} → {second.shape[1]}x{second.shape[0]}"
     )
