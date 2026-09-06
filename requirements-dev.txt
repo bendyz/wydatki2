@@ -1,0 +1,3 @@
+# Zależności deweloperskie — NIE instalowane do obrazu (Dockerfile bierze requirements.txt)
+-r requirements.txt
+pytest==8.4.2
