@@ -1,7 +1,6 @@
 import asyncio
 import io
 import logging
-import os
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -46,7 +45,7 @@ def _decode_upright(contents: bytes) -> np.ndarray:
         image = Image.open(io.BytesIO(contents))
         image = ImageOps.exif_transpose(image)
         rgb = np.array(image.convert("RGB"))
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise ValueError(
             "Nie można odczytać obrazu. Upewnij się, że plik jest poprawnym zdjęciem."
         ) from exc
@@ -57,6 +56,7 @@ def _process_and_save(
     contents: bytes,
     save_path: str,
     already_cropped: bool,
+    expense_id: int,
 ) -> Optional[Detection]:
     """
     Cały blok CPU: dekodowanie, kadrowanie, skalowanie, binaryzacja, zapis.
@@ -64,13 +64,21 @@ def _process_and_save(
     Wołane przez `asyncio.to_thread` — to setki milisekund czystej pracy procesora,
     która nie może blokować pętli zdarzeń.
 
-    Zwraca metryki detekcji do zalogowania przez wołającego, albo None gdy detekcja
-    nie znalazła paragonu, została pominięta flagą lub padła.
+    Jedyne miejsce, które wie, co faktycznie się stało z detekcją (pominięta
+    flagą, nic nie znalazła, czy padła z wyjątkiem), więc loguje tu wszystkie
+    trzy warianty na poziomie INFO — spec §5.3 czyni tę linię jedynym źródłem
+    danych przy strojeniu progów, więc "nie znalazłem" i "detekcja padła" nie
+    mogą dzielić jednego komunikatu.
+
+    Zwraca metryki detekcji, albo None gdy detekcja nie znalazła paragonu,
+    została pominięta flagą lub padła.
     """
     img = _decode_upright(contents)
 
     detection = None
-    if not already_cropped:
+    if already_cropped:
+        logger.info("Detekcja pominięta (already_cropped), wydatek %s", expense_id)
+    else:
         try:
             img, detection = crop_receipt(img)
         except cv2.error:
@@ -78,6 +86,19 @@ def _process_and_save(
                 "Detekcja paragonu nie powiodła się, zapisuję bez kadrowania",
                 exc_info=True,
             )
+            logger.info("Detekcja: błąd detekcji, wydatek %s", expense_id)
+        else:
+            if detection is None:
+                logger.info("Detekcja: brak kandydata, wydatek %s", expense_id)
+            else:
+                logger.info(
+                    "Detekcja: ocena=%.3f udzial=%.3f kadr=%dx%d, wydatek %s",
+                    detection.score,
+                    detection.frame_ratio,
+                    detection.out_size[0],
+                    detection.out_size[1],
+                    expense_id,
+                )
 
     height, width = img.shape[:2]
     if max(height, width) > MAX_DIMENSION:
@@ -124,23 +145,9 @@ async def save_and_process_receipt_image(
     file_path = expense_folder / filename
 
     contents = await upload_file.read()
-    detection = await asyncio.to_thread(
-        _process_and_save, contents, str(file_path), already_cropped
+    await asyncio.to_thread(
+        _process_and_save, contents, str(file_path), already_cropped, expense_id
     )
-
-    if already_cropped:
-        logger.info("Detekcja pominięta (already_cropped), wydatek %s", expense_id)
-    elif detection is None:
-        logger.info("Detekcja: brak kandydata, wydatek %s", expense_id)
-    else:
-        logger.info(
-            "Detekcja: ocena=%.3f udzial=%.3f kadr=%dx%d, wydatek %s",
-            detection.score,
-            detection.frame_ratio,
-            detection.out_size[0],
-            detection.out_size[1],
-            expense_id,
-        )
 
     return str(file_path.relative_to(Path(".")))
 

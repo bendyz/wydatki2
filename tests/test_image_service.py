@@ -89,7 +89,7 @@ def test_flaga_already_cropped_pomija_detekcje(tmp_path):
     target = tmp_path / "wynik.jpg"
 
     with patch("app.services.image_service.crop_receipt") as detektor:
-        result = _process_and_save(contents, str(target), already_cropped=True)
+        result = _process_and_save(contents, str(target), already_cropped=True, expense_id=1)
 
     detektor.assert_not_called()
     assert result is None
@@ -103,7 +103,7 @@ def test_bez_flagi_detekcja_jest_wolana(tmp_path):
 
     with patch("app.services.image_service.crop_receipt") as detektor:
         detektor.return_value = (np.zeros((40, 80, 3), np.uint8), fake)
-        result = _process_and_save(contents, str(target), already_cropped=False)
+        result = _process_and_save(contents, str(target), already_cropped=False, expense_id=1)
 
     detektor.assert_called_once()
     assert result == fake
@@ -118,7 +118,36 @@ def test_blad_opencv_nie_przerywa_zapisu(tmp_path):
     target = tmp_path / "wynik.jpg"
 
     with patch("app.services.image_service.crop_receipt", side_effect=cv2.error("bum")):
-        result = _process_and_save(contents, str(target), already_cropped=False)
+        result = _process_and_save(contents, str(target), already_cropped=False, expense_id=1)
 
     assert result is None
     assert target.exists(), "Plik musi powstać mimo błędu detekcji"
+
+
+def test_loguje_rozne_komunikaty_dla_braku_kandydata_i_bledu_detekcji(tmp_path, caplog):
+    """
+    Log INFO musi rozróżniać „nie znalazłem" od „detekcja padła" — to jedyne
+    źródło danych przy strojeniu progów (spec §5.3), więc nie mogą dzielić
+    jednego komunikatu.
+    """
+    import cv2
+
+    contents = _jpeg_with_orientation(120, 60, orientation=1)
+
+    with caplog.at_level("INFO", logger="app.services.image_service"):
+        with patch("app.services.image_service.crop_receipt", return_value=(np.zeros((40, 80, 3), np.uint8), None)):
+            _process_and_save(
+                contents, str(tmp_path / "brak.jpg"), already_cropped=False, expense_id=1
+            )
+        brak_kandydata_logi = [r.message for r in caplog.records]
+        caplog.clear()
+
+        with patch("app.services.image_service.crop_receipt", side_effect=cv2.error("bum")):
+            _process_and_save(
+                contents, str(tmp_path / "blad.jpg"), already_cropped=False, expense_id=2
+            )
+        blad_logi = [r.message for r in caplog.records if r.levelname == "INFO"]
+
+    assert any("brak kandydata" in m for m in brak_kandydata_logi)
+    assert not any("brak kandydata" in m for m in blad_logi)
+    assert any("błąd" in m for m in blad_logi)
