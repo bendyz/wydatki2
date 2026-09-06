@@ -32,6 +32,8 @@ There are no tests in this project.
 - **Frontend**: Jinja2 templates (`templates/`) + vanilla JS (`static/js/app.js`) — single-page feel served from `GET /`
 - **AI**: OpenRouter API (LLM + vision) — configured in `data/config/config.yaml`
 - **Image processing**: OpenCV (`image_service.py`) converts receipt photos to grayscale + adaptive threshold before sending to AI
+  - Receipt *detection/cropping* is not implemented here — only in the Android app.
+    Port plan + Python sketch: `docs/port-detekcji-paragonu-z-androida.md`
 - **Background jobs**: APScheduler (`app/worker/scheduler.py`) runs daily at midnight to generate expenses from due subscriptions
 
 ### Styling — IMPORTANT: shade numbers mean ROLES, not lightness
