@@ -280,22 +280,64 @@ jako krok **przed** skalowaniem do `MAX_DIMENSION` i przed `adaptiveThreshold`.
 
 ### 9.2. Podwójne kadrowanie — trzeba zablokować ręcznie
 
+> **Zapis skorygowany pomiarem na prawdziwych zdjęciach (§9.9).** Ten akapit w wersji
+> sprzed portu oceniał ryzyko jako niegroźne i rekomendował strażnik geometryczny. Oba
+> ustalenia okazały się błędne, gdy port przeszedł z syntetycznej sceny na prawdziwe
+> zdjęcia. Sekcja zostaje, żeby było widać, co sądziliśmy i dlaczego to się zmieniło —
+> nie usuwamy jej, poprawiamy.
+
 Kuszące założenie brzmi: zdjęcie **już wykadrowane** przez telefon ma paragon na całym
 kadrze, więc `udzial > MAX_UDZIAL_KADRU (0.95)` odsieje kandydata i backend zostawi obraz
-w spokoju. **To nieprawda** — sprawdzone na syntetycznej scenie: drugi przebieg na własnym
-wyjściu daje `udzial = 0.915`, czyli poniżej progu, i obraz jest prostowany po raz drugi.
-Krawędzie paragonu leżą wtedy na samej granicy kadru, więc wykryty czworokąt bywa o kilka
-pikseli skośny i każdy kolejny przebieg dokłada trochę skosu (516×436 → 514×434).
+w spokoju. **To nieprawda** — sprawdzone najpierw na syntetycznej scenie: drugi przebieg na
+własnym wyjściu daje `udzial = 0.915`, czyli poniżej progu, i obraz jest prostowany po raz
+drugi. Krawędzie paragonu leżą wtedy na samej granicy kadru, więc wykryty czworokąt bywa o
+kilka pikseli skośny i każdy kolejny przebieg dokłada trochę skosu (516×436 → 514×434).
 
-Jedno przejście za dużo jest niegroźne, ale trzeba je świadomie odciąć. Dwa wyjścia:
+**Jedno przejście za dużo nie jest niegroźne — na prawdziwych zdjęciach niszczy obraz.**
+`test_powtorne_kadrowanie_niczego_nie_zjada` (§9.9) uruchomiony na 16 zdjęciach z pomiaru
+pokazuje, że 10 z nich wypada poniżej progu pokrycia 0.98, najgorzej `07.jpg` przy 0.476 —
+drugi przebieg zostawia niecałą połowę powierzchni pierwszego wyjścia. Syntetyczny pomiar
+sprzed portu (`udzial = 0.915`, lekki skos) był optymistyczny: na realnych zdjęciach
+przyczyna strukturalna opisana w §9.9 (`_surround_contrast` ocenia kandydata kontrastem z
+otoczeniem, a otoczenie kadru-w-kadrze leży wewnątrz paragonu) potrafi też zjeść znaczną
+część kadru, nie tylko go przekrzywić.
+
+To obala też rekomendację strażnika poniżej: przy drugim przebiegu na tych samych 18
+zdjęciach `frame_ratio` (`udzial`) zwycięskiego kandydata mieści się w przedziale
+**0.477–0.894** — próg `udzial > 0.90` nie zadziałałby prawie na żadnym z nich, bo już
+wykadrowane zdjęcia w praktyce nie mają `udzial` blisko 1.0 (drugi przebieg regularnie
+zawęża kadr, więc kandydat, którego strażnik miałby odsiać, sam wygląda jak niewykadrowany).
+
+Sprawdzono też dwa alternatywne strażniki geometryczne po stronie serwera na tych samych 18
+zdjęciach, licząc dla każdego oryginał-vs-kadr:
+
+- pokrycie mapy papieru (`udzial` pikseli „papierowych" w całym kadrze): **0.897** dla
+  oryginałów vs **0.657** dla już wykadrowanych zdjęć;
+- udział papierowych pikseli tuż przy brzegu kadru: **0.681** vs **0.149**.
+
+Przedziały się nakładają — żaden tani predykat geometryczny nie odróżnia niezawodnie „już
+wykadrowany" od „sfotografowany na jasnym/papierowym tle", i to z tej samej przyczyny, dla
+której detektor myli te dwa przypadki: brak wyraźnego kontrastu z otoczeniem, gdy paragon
+wypełnia kadr.
+
+Dwa rozważane wyjścia:
 
 - **Strażnik w `wykadruj_paragon`**: gdy `udzial > 0.90` **i** czworokąt jest praktycznie
   prostokątem osiowym (rogi w granicach paru pikseli od narożników kadru) — nie ma co
   prostować, zwróć oryginał. Działa dla każdego klienta, nic nie trzeba zmieniać w API.
-- **Flaga w multiparcie** (`already_cropped=true` z apki). Prostsze, ale zaufanie do klienta
-  i trzeba pamiętać przy każdym nowym.
+  **Nie zadziała**: patrz pomiar wyżej — żaden zmierzony `udzial` zwycięskiego kandydata
+  na już wykadrowanych zdjęciach nie przekracza 0.90, a alternatywne strażniki geometryczne
+  mają przedziały nakładające się z oryginałami.
+- **Flaga w multiparcie** (`already_cropped=true` z apki). Zaufanie do klienta i trzeba
+  pamiętać przy każdym nowym, ale klient wie na pewno, czy już kadrował — a to jest jedyna
+  informacja, której serwerowi tu brakuje.
 
-Rekomendacja: strażnik. Flaga rozwiązuje tylko przypadek, który sami kontrolujemy.
+**Rekomendacja (skorygowana): flaga.** Dokument sprzed pomiaru rekomendował strażnik ze
+złego powodu — zakładał, że ryzyko podwójnego kadrowania jest kosmetyczne (lekki skos) i że
+istnieje tani predykat geometryczny. Oba założenia pomiar obalił: ryzyko jest strukturalne
+(realna utrata obrazu, nie tylko skos) i nie ma odróżniającego predykatu geometrycznego —
+patrz §9.9 i sekcja "Poza zakresem" dokumentu projektowego portu. Flaga `already_cropped`
+zostaje więc jedynym niezawodnym rozwiązaniem, nie tylko prostszym.
 
 ### 9.3. Fałszywe trafienia — w backendzie kosztują więcej niż w apce
 

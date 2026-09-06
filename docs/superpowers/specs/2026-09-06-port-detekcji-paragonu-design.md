@@ -256,9 +256,16 @@ go uzasadni.
 Świadome ubytki:
 
 - **Strażnik podwójnego kadrowania (§9.2)** — zastąpiony flagą. Cena: APK w wersji sprzed tej
-  zmiany, który wyśle wykadrowany paragon bez flagi, dostanie drugie prostowanie
-  (`udzial = 0.915`, kadr 516×436 → 514×434, lekki skos). Jednorazowo niegroźne, przechodzi
-  po aktualizacji apki.
+  zmiany, który wyśle wykadrowany paragon bez flagi, dostanie drugie prostowanie. Pierwsza
+  ocena (syntetyczna scena, `udzial = 0.915`, kadr 516×436 → 514×434) mówiła "lekki skos,
+  jednorazowo niegroźne" — **pomiar na prawdziwych zdjęciach ją obala**:
+  `test_powtorne_kadrowanie_niczego_nie_zjada` (§9.9 dokumentu źródłowego) pokazuje 10 z 16
+  zdjęć poniżej progu pokrycia 0.98, najgorzej `07.jpg` przy 0.476 — drugi przebieg zostawia
+  niecałą połowę powierzchni pierwszego wyjścia, nie tylko lekki skos. Cena jednorazowego
+  braku flagi jest więc realna utrata obrazu, nie kosmetyka. To samo obala rekomendację
+  strażnika z §9.2: przy drugim przebiegu na wszystkich 18 zdjęciach `frame_ratio`
+  zwycięskiego kandydata mieści się w przedziale 0.477–0.894, więc próg `udzial > 0.90` nie
+  zadziałałby prawie na żadnym z nich — patrz poprawiony §9.2 dokumentu źródłowego.
 - **Zestaw negatywny (§8, §9.3)** — biurko, klawiatura, kubek, książka. Bez niego odrzucanie
   stroi się na ślepo, a przy trybie „na ostro" fałszywe trafienie idzie do AI niezauważone.
   Dług świadomy: żeby go spłacić, trzeba najpierw zrobić zdjęcia, których nie ma. Log
