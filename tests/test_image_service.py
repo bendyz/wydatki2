@@ -29,7 +29,8 @@ def test_prostuje_orientacje_z_exif():
     )
 
 
-def test_zostawia_zdjecie_bez_exif_w_spokoju():
+def test_zostawia_zdjecie_z_orientacja_neutralna_w_spokoju():
+    """Orientation=1 to orientacja neutralna (nie brak EXIF) — obraz nie powinien się obrócić."""
     contents = _jpeg_with_orientation(120, 60, orientation=1)
 
     result = _decode_upright(contents)
@@ -40,3 +41,42 @@ def test_zostawia_zdjecie_bez_exif_w_spokoju():
 def test_odrzuca_plik_ktory_nie_jest_obrazem():
     with pytest.raises(ValueError, match="Nie można odczytać obrazu"):
         _decode_upright(b"to nie jest obraz")
+
+
+def test_odrzuca_obciety_plik_z_poprawnym_naglowkiem():
+    """Nagłówek JPEG poprawny, ale ciało ucięte — dekodowanie pikseli musi rzucić ValueError, a nie 500."""
+    contents = _jpeg_with_orientation(120, 60, orientation=1)
+    truncated = contents[: len(contents) // 2]
+
+    with pytest.raises(ValueError, match="Nie można odczytać obrazu"):
+        _decode_upright(truncated)
+
+
+def test_odrzuca_gdy_konwersja_do_rgb_rzuca_oserror(monkeypatch):
+    """
+    `image.convert("RGB")` musi być chronione tym samym try/except co reszta dekodowania.
+
+    `ImageOps.exif_transpose` w dzisiejszym Pillow wymusza pełne dekodowanie pikseli
+    (`image.load()`) zanim w ogóle wróci, więc obcięty plik z tagiem EXIF zawsze
+    wybucha wcześniej i ten konkretny defekt nie ujawnia się empirycznie na
+    obciętych plikach. Ten test nie zależy od tego szczegółu implementacyjnego:
+    podstawia obiekt, którego `convert()` rzuca `OSError` dopiero na końcowym
+    kroku, i sprawdza, że mimo to wychodzi `ValueError`, a nie nieprzechwycony
+    wyjątek.
+    """
+
+    class _ObrazZeZlymiPikselami:
+        def convert(self, mode):
+            raise OSError("uszkodzone dane pikseli")
+
+    monkeypatch.setattr(
+        "app.services.image_service.Image.open",
+        lambda _buffer: _ObrazZeZlymiPikselami(),
+    )
+    monkeypatch.setattr(
+        "app.services.image_service.ImageOps.exif_transpose",
+        lambda image: image,
+    )
+
+    with pytest.raises(ValueError, match="Nie można odczytać obrazu"):
+        _decode_upright(b"tresc bez znaczenia, Image.open jest podstawiony")

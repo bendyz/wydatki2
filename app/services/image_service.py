@@ -43,11 +43,12 @@ def _decode_upright(contents: bytes) -> np.ndarray:
     try:
         image = Image.open(io.BytesIO(contents))
         image = ImageOps.exif_transpose(image)
+        rgb = np.array(image.convert("RGB"))
     except (UnidentifiedImageError, OSError) as exc:
         raise ValueError(
             "Nie można odczytać obrazu. Upewnij się, że plik jest poprawnym zdjęciem."
         ) from exc
-    return cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
+    return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
 async def save_and_process_receipt_image(
