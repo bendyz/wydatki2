@@ -19,9 +19,15 @@ pip install -r requirements.txt
 
 # Interactive API docs (when server is running)
 # http://localhost:8000/docs
+
+# Run tests (detection regression needs the photo set from the Android repo)
+pip install -r requirements-dev.txt
+pytest tests/ -v
 ```
 
-There are no tests in this project.
+Testy pokrywają wyłącznie detekcję paragonu i pipeline obrazu. Zestaw 18 zdjęć jest
+poza gitem (`~/Projekty/wydatki2.0android/app/src/androidTest/assets/`, ścieżka
+nadpisywalna przez `RECEIPT_TEST_SET`) — bez niego testy detekcji się pomijają.
 
 ## Architecture
 
@@ -31,9 +37,18 @@ There are no tests in this project.
 - **Backend**: FastAPI, SQLAlchemy 2.0 (sync), SQLite via `aiosqlite`
 - **Frontend**: Jinja2 templates (`templates/`) + vanilla JS (`static/js/app.js`) — single-page feel served from `GET /`
 - **AI**: OpenRouter API (LLM + vision) — configured in `data/config/config.yaml`
-- **Image processing**: OpenCV (`image_service.py`) converts receipt photos to grayscale + adaptive threshold before sending to AI
-  - Receipt *detection/cropping* is not implemented here — only in the Android app.
-    Port plan + Python sketch: `docs/port-detekcji-paragonu-z-androida.md`
+- **Image processing**: OpenCV (`image_service.py`) — EXIF → detekcja i prostowanie
+  paragonu (`receipt_detection.py`) → skalowanie → grayscale + adaptive threshold.
+  Klient może pominąć detekcję flagą `already_cropped` w multiparcie.
+  Opis algorytmu i progów: `docs/port-detekcji-paragonu-z-androida.md`.
+  - EXIF-owa korekta orientacji (`_decode_upright`) idzie teraz przez każdy upload,
+    także z klientów sprzed tej zmiany — wcześniej `save_and_process_receipt_image`
+    dekodowało surowym `cv2.imdecode` bez korekty.
+  - **Warunek wydania**: aplikacja androidowa musi wysyłać `already_cropped=true`,
+    zanim ta gałąź trafi na produkcję — inaczej każdy skan z telefonu (już
+    wykadrowany po stronie apki) zostanie wykadrowany drugi raz i zniszczony (patrz
+    `docs/port-detekcji-paragonu-z-androida.md` §9.9). Zmiana leży w
+    `../wydatki2.0android`, poza zakresem tego repo.
 - **Background jobs**: APScheduler (`app/worker/scheduler.py`) runs daily at midnight to generate expenses from due subscriptions
 
 ### Styling — IMPORTANT: shade numbers mean ROLES, not lightness
@@ -77,11 +92,13 @@ Other conventions that follow from this:
 All settings live in `data/config/config.yaml` (loaded by `app/core/config.py`). Three env vars override YAML: `OPENROUTER_API_KEY`, `DATABASE_URL`, `PORT`. The SQLite database is at `data/db/wydatki.db`. Receipt images are stored under `data/uploads/receipts/<expense_id>/`.
 
 ### Data model
-Five SQLAlchemy models in `app/models/models.py`:
+Ten SQLAlchemy models in `app/models/models.py`:
 - `User` → owns `Expense`, `Subscription`, `Category`
 - `Category` — can be user-scoped or global (`user_id` nullable)
 - `Expense` → has optional `ExpenseItem` line items and optional `receipt_image_path`
 - `Subscription` — tracks `frequency_days`, `next_billing_date`, `remaining_installments`; scheduler converts due ones into `Expense` rows
+- `PaymentCard`, `Tag` — user-scoped lookup tables referenced by `Expense`
+- `AssetKeyConfig`, `AssetAccount`, `AssetSnapshot` — asset/net-worth tracking
 
 ### API structure
 All REST endpoints under `/api/v1/` (registered in `app/api/v1/router.py`):
@@ -90,6 +107,9 @@ All REST endpoints under `/api/v1/` (registered in `app/api/v1/router.py`):
 - `/receipts` — attach/retrieve images for an existing expense
 - `/ai/receipt` — upload image → OpenCV processing → OpenRouter vision → returns `ExpenseDraft` (not saved)
 - `/ai/text` — natural language description → OpenRouter LLM → returns `ExpenseDraft` (not saved)
+- `/tags`, `/cards` — CRUD for `Tag` / `PaymentCard` lookup tables
+- `/assets` — asset accounts and snapshots (net worth tracking)
+- `/admin` — administrative endpoints
 
 ### AI draft flow
 Both AI endpoints return `ExpenseDraft` (schema in `app/schemas/ai_draft.py`) for user confirmation — nothing is persisted automatically. The draft includes duplicate-detection warnings (checked in `ai_service._check_duplicates` against expenses ±3 days with amount within 0.5 PLN threshold). The caller must explicitly `POST /expenses` to save.
