@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -11,6 +12,7 @@ from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.core.config import settings
+from app.services.receipt_detection import Detection, crop_receipt
 
 logger = logging.getLogger(__name__)
 
@@ -51,77 +53,95 @@ def _decode_upright(contents: bytes) -> np.ndarray:
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
+def _process_and_save(
+    contents: bytes,
+    save_path: str,
+    already_cropped: bool,
+) -> Optional[Detection]:
+    """
+    Cały blok CPU: dekodowanie, kadrowanie, skalowanie, binaryzacja, zapis.
+
+    Wołane przez `asyncio.to_thread` — to setki milisekund czystej pracy procesora,
+    która nie może blokować pętli zdarzeń.
+
+    Zwraca metryki detekcji do zalogowania przez wołającego, albo None gdy detekcja
+    nie znalazła paragonu, została pominięta flagą lub padła.
+    """
+    img = _decode_upright(contents)
+
+    detection = None
+    if not already_cropped:
+        try:
+            img, detection = crop_receipt(img)
+        except cv2.error:
+            logger.warning(
+                "Detekcja paragonu nie powiodła się, zapisuję bez kadrowania",
+                exc_info=True,
+            )
+
+    height, width = img.shape[:2]
+    if max(height, width) > MAX_DIMENSION:
+        scale = MAX_DIMENSION / max(height, width)
+        img = cv2.resize(
+            img, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA
+        )
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    processed = cv2.adaptiveThreshold(
+        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+
+    cv2.imwrite(save_path, processed, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    return detection
+
+
 async def save_and_process_receipt_image(
     upload_file: UploadFile,
     expense_id: int,
+    already_cropped: bool = False,
 ) -> str:
     """
-    Saves and processes a receipt image:
-    1. Reads uploaded image
-    2. Converts to grayscale
-    3. Applies adaptive thresholding for better OCR readability
-    4. Resizes if too large
-    5. Saves as optimized JPEG
+    Zapisuje i przetwarza zdjęcie paragonu:
+    1. Dekoduje z korektą orientacji EXIF
+    2. Wykrywa i prostuje paragon (chyba że klient zgłosił `already_cropped`)
+    3. Skaluje, jeśli obraz jest za duży
+    4. Konwertuje do szarości i binaryzuje dla czytelności
+    5. Zapisuje jako zoptymalizowany JPEG
 
     Args:
         upload_file: FastAPI UploadFile object
-        expense_id: ID of associated expense (used for subfolder)
+        expense_id: ID associated expense (used for subfolder)
+        already_cropped: klient zgłasza, że paragon jest już wykadrowany
 
     Returns:
         Relative path to the saved image
     """
-    # Create subfolder per expense for organization
     expense_folder = UPLOAD_DIR / str(expense_id)
     expense_folder.mkdir(parents=True, exist_ok=True)
 
     filename = generate_unique_filename(upload_file.filename or "receipt.jpg")
     file_path = expense_folder / filename
 
-    # Read uploaded file into memory
     contents = await upload_file.read()
+    detection = await asyncio.to_thread(
+        _process_and_save, contents, str(file_path), already_cropped
+    )
 
-    # Convert bytes to numpy array for OpenCV
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-    if img is None:
-        raise ValueError(
-            "Nie można odczytać obrazu. Upewnij się, że plik jest poprawnym zdjęciem."
+    if already_cropped:
+        logger.info("Detekcja pominięta (already_cropped), wydatek %s", expense_id)
+    elif detection is None:
+        logger.info("Detekcja: brak kandydata, wydatek %s", expense_id)
+    else:
+        logger.info(
+            "Detekcja: ocena=%.3f udzial=%.3f kadr=%dx%d, wydatek %s",
+            detection.score,
+            detection.frame_ratio,
+            detection.out_size[0],
+            detection.out_size[1],
+            expense_id,
         )
 
-    # Resize if image is too large (saves space)
-    height, width = img.shape[:2]
-    if max(height, width) > MAX_DIMENSION:
-        scale = MAX_DIMENSION / max(height, width)
-        new_width = int(width * scale)
-        new_height = int(height * scale)
-        img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
-
-    # Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Apply Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    # Adaptive thresholding for better text contrast (black & white effect)
-    processed = cv2.adaptiveThreshold(
-        blurred,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        11,
-        2,
-    )
-
-    # Save as optimized JPEG
-    save_path = str(file_path)
-    cv2.imwrite(
-        save_path,
-        processed,
-        [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY],
-    )
-
-    # Return relative path from project root
     return str(file_path.relative_to(Path(".")))
 
 

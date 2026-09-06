@@ -1,11 +1,13 @@
 """Testy pipeline'u przetwarzania zdjęcia paragonu."""
 import io
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from app.services.image_service import _decode_upright
+from app.services.image_service import _decode_upright, _process_and_save
+from app.services.receipt_detection import Detection
 
 
 def _jpeg_with_orientation(width: int, height: int, orientation: int) -> bytes:
@@ -80,3 +82,43 @@ def test_odrzuca_gdy_konwersja_do_rgb_rzuca_oserror(monkeypatch):
 
     with pytest.raises(ValueError, match="Nie można odczytać obrazu"):
         _decode_upright(b"tresc bez znaczenia, Image.open jest podstawiony")
+
+
+def test_flaga_already_cropped_pomija_detekcje(tmp_path):
+    contents = _jpeg_with_orientation(120, 60, orientation=1)
+    target = tmp_path / "wynik.jpg"
+
+    with patch("app.services.image_service.crop_receipt") as detektor:
+        result = _process_and_save(contents, str(target), already_cropped=True)
+
+    detektor.assert_not_called()
+    assert result is None
+    assert target.exists()
+
+
+def test_bez_flagi_detekcja_jest_wolana(tmp_path):
+    contents = _jpeg_with_orientation(120, 60, orientation=1)
+    target = tmp_path / "wynik.jpg"
+    fake = Detection(score=0.42, frame_ratio=0.5, out_size=(80, 40))
+
+    with patch("app.services.image_service.crop_receipt") as detektor:
+        detektor.return_value = (np.zeros((40, 80, 3), np.uint8), fake)
+        result = _process_and_save(contents, str(target), already_cropped=False)
+
+    detektor.assert_called_once()
+    assert result == fake
+    assert target.exists()
+
+
+def test_blad_opencv_nie_przerywa_zapisu(tmp_path):
+    """Wyjątek z detekcji degraduje do obrazu nieskadrowanego — upload musi przejść."""
+    import cv2
+
+    contents = _jpeg_with_orientation(120, 60, orientation=1)
+    target = tmp_path / "wynik.jpg"
+
+    with patch("app.services.image_service.crop_receipt", side_effect=cv2.error("bum")):
+        result = _process_and_save(contents, str(target), already_cropped=False)
+
+    assert result is None
+    assert target.exists(), "Plik musi powstać mimo błędu detekcji"
