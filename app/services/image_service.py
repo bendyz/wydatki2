@@ -1,3 +1,5 @@
+import io
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -6,8 +8,11 @@ from typing import Optional
 import cv2
 import numpy as np
 from fastapi import UploadFile
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Base directory for uploads from config
 UPLOAD_DIR = Path(settings.storage.uploads_path)
@@ -26,6 +31,23 @@ def generate_unique_filename(original_filename: str) -> str:
     if ext not in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
         ext = ".jpg"
     return f"{uuid.uuid4().hex}{ext}"
+
+
+def _decode_upright(contents: bytes) -> np.ndarray:
+    """
+    Dekoduje bajty do BGR, prostując orientację z EXIF.
+
+    `cv2.imdecode` ignoruje EXIF, więc zdjęcie z telefonu przyszłoby w orientacji
+    sensora i zapisany kadr poleciałby do modelu bokiem. Pillow czyta tag i obraca.
+    """
+    try:
+        image = Image.open(io.BytesIO(contents))
+        image = ImageOps.exif_transpose(image)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError(
+            "Nie można odczytać obrazu. Upewnij się, że plik jest poprawnym zdjęciem."
+        ) from exc
+    return cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
 
 
 async def save_and_process_receipt_image(
