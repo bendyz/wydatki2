@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -34,6 +34,10 @@ ALLOWED_CONTENT_TYPES = {
 async def upload_receipt_image(
     expense_id: int,
     file: UploadFile = File(..., description="Zdjęcie paragonu do przetworzenia"),
+    already_cropped: bool = Form(
+        False,
+        description="Klient zgłasza, że paragon jest już wykadrowany — backend pominie detekcję",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -63,7 +67,9 @@ async def upload_receipt_image(
 
     # Zapisz i przetwórz nowe zdjęcie
     try:
-        relative_path = await save_and_process_receipt_image(file, expense_id)
+        relative_path = await save_and_process_receipt_image(
+            file, expense_id, already_cropped=already_cropped
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

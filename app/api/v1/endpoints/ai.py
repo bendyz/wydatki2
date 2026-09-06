@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -34,6 +34,10 @@ class TextExpenseRequest(BaseModel):
 )
 async def analyze_receipt(
     file: UploadFile = File(..., description="Zdjęcie paragonu (JPG, PNG, WEBP)"),
+    already_cropped: bool = Form(
+        False,
+        description="Klient zgłasza, że paragon jest już wykadrowany — backend pominie detekcję",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -51,7 +55,9 @@ async def analyze_receipt(
 
     # Zapisz zdjęcie tymczasowo (bez przypisania do wydatku, expense_id=0 jako temp)
     try:
-        temp_path = await save_and_process_receipt_image(file, expense_id=0)
+        temp_path = await save_and_process_receipt_image(
+            file, expense_id=0, already_cropped=already_cropped
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
