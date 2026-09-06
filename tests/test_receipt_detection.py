@@ -89,29 +89,58 @@ def test_wykrywa_paragon_zgodnie_z_oznaczeniem(photo, receipt_set_dir, annotatio
     )
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "Zmierzona rzeczywistość na prawdziwych zdjęciach, nie usterka testu: "
-        "powtórne kadrowanie realnie zjada obraz. 10 z 16 mierzonych zdjęć wypada "
-        "poniżej progu 0.98, najgorzej 07.jpg (pokrycie 0.476 — drugi przebieg "
-        "zostawia niecałą połowę powierzchni pierwszego wyjścia). Przyczyna jest "
-        "strukturalna, nie losowa: `_surround_contrast` ocenia kandydata, "
-        "porównując jego wnętrze z pierścieniem tuż na zewnątrz. Gdy paragon "
-        "wypełnia cały kadr (a tak wygląda już wykadrowane zdjęcie), pierścień "
-        "wokół prawdziwego czworokąta leży w całości wewnątrz paragonu — kontrast "
-        "wychodzi bliski zeru i przegrywa z wewnętrznym prostokątem (blokiem "
-        "tekstu), który ma prawdziwy pierścień tła na zewnątrz. To nie jest coś, "
-        "co da się podkręcić progiem: dopóki wynik zależy od kontrastu z "
-        "otoczeniem, kadr-w-kadrze będzie z definicji mylący. Dlatego flaga "
-        "`already_cropped` (zadanie 6) jest warunkiem poprawności API, nie "
-        "wygodą — na już wykadrowanym obrazie detekcja nie powinna być "
-        "uruchamiana ponownie. `strict=False`: jeśli kiedyś detektor przestanie "
-        "mieć tę wadę, ten test zrobi się XPASS — to ma być sygnał, żeby zdjąć "
-        "dekorator, a nie kolejny czerwony wynik do ignorowania."
-    ),
+# Zmierzona rzeczywistość na prawdziwych zdjęciach, nie usterka testu: powtórne
+# kadrowanie realnie zjada obraz. 10 z 16 mierzonych zdjęć wypada poniżej progu
+# 0.98, najgorzej 07.jpg (pokrycie 0.476 — drugi przebieg zostawia niecałą połowę
+# powierzchni pierwszego wyjścia). Przyczyna jest strukturalna, nie losowa:
+# `_surround_contrast` ocenia kandydata, porównując jego wnętrze z pierścieniem
+# tuż na zewnątrz. Gdy paragon wypełnia cały kadr (a tak wygląda już wykadrowane
+# zdjęcie), pierścień wokół prawdziwego czworokąta leży w całości wewnątrz
+# paragonu — kontrast wychodzi bliski zeru i przegrywa z wewnętrznym
+# prostokątem (blokiem tekstu), który ma prawdziwy pierścień tła na zewnątrz.
+# To nie jest coś, co da się podkręcić progiem: dopóki wynik zależy od
+# kontrastu z otoczeniem, kadr-w-kadrze będzie z definicji mylący. Dlatego
+# flaga `already_cropped` (zadanie 6) jest warunkiem poprawności API, nie
+# wygodą — na już wykadrowanym obrazie detekcja nie powinna być uruchamiana
+# ponownie.
+#
+# Ta lista to właśnie te 10 zdjęć — zmierzone, nie zgadywane. Marker `xfail`
+# stoi tylko na nich (per-parametryzacja, nie blankietowo nad całym testem),
+# żeby pozostałe zdjęcia (01, 05, 06, 15, 16, 17), na których własność w
+# praktyce zachodzi, dalej asertowały normalnie i szły na czerwono, gdy się
+# zepsują — to jedyne miejsce, które by to zauważyło.
+#
+# Kto naprawi `_surround_contrast` (albo detektor przestanie mieć tę wadę z
+# innego powodu): usuń tę listę i dekorator `xfail` całkiem — test poniżej ma
+# wtedy asertować normalnie na wszystkich zdjęciach.
+ZNANE_PORAZKI_PODWOJNEGO_KADROWANIA = frozenset({
+    "02.jpg", "03.jpg", "04.jpg", "07.jpg", "09.jpg",
+    "10.jpg", "11.jpg", "12.jpg", "13.jpg", "14.jpg",
+})
+
+
+def _powtorne_kadrowanie_case(photo: str):
+    """`pytest.param` z `xfail` tylko dla zmierzonych znanych porażek, `strict=False`."""
+    if photo in ZNANE_PORAZKI_PODWOJNEGO_KADROWANIA:
+        return pytest.param(
+            photo,
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason=(
+                    "Zmierzona znana porażka podwójnego kadrowania — patrz komentarz "
+                    "nad ZNANE_PORAZKI_PODWOJNEGO_KADROWANIA. `strict=False`: jeśli "
+                    "kiedyś detektor przestanie mieć tę wadę, ten przypadek zrobi się "
+                    "XPASS — to ma być sygnał, żeby zdjąć zdjęcie z listy, a nie "
+                    "kolejny czerwony wynik do ignorowania."
+                ),
+            ),
+        )
+    return pytest.param(photo)
+
+
+@pytest.mark.parametrize(
+    "photo", [_powtorne_kadrowanie_case(p) for p in photo_names()]
 )
-@pytest.mark.parametrize("photo", photo_names())
 def test_powtorne_kadrowanie_niczego_nie_zjada(photo, receipt_set_dir, annotations):
     """
     Drugi przebieg na własnym wyjściu musi być praktycznie tożsamością.
