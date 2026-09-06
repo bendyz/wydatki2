@@ -191,9 +191,14 @@ w wątku. Sygnatura dla obu endpointów bez zmian poza nową flagą.
 
 ### 6.1. `requirements-dev.txt`
 
-Nowy plik: `pytest`, `pytest-asyncio`. **Nie** do `requirements.txt` — ten instaluje
-Dockerfile do obrazu produkcyjnego. `tests/` i `scripts/` nie są kopiowane do obrazu, więc
-runtime się nie zmienia.
+Nowy plik: `pytest`. **Nie** do `requirements.txt` — ten instaluje Dockerfile do obrazu
+produkcyjnego. `tests/` i `scripts/` nie są kopiowane do obrazu, więc runtime się nie zmienia.
+
+Dochodzi też `pytest.ini` z `pythonpath = .`: repo nie jest pakietem instalowalnym i nie ma
+`pyproject.toml`, więc bez tego testy nie zaimportują `app.*`.
+
+`pytest-asyncio` nie jest potrzebne — testy celują w funkcje synchroniczne
+(`_decode_upright`, `_process_and_save`, detektor), nie w `async def`.
 
 To pierwszy test w tym repo; `CLAUDE.md` („There are no tests in this project") wymaga
 aktualizacji.
