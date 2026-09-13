@@ -88,6 +88,13 @@ Other conventions that follow from this:
   in `app.js` darkens them at render time in light mode — don't bypass it when
   rendering category dots or chart segments.
 
+### Release notes
+User-facing changes go to `CHANGELOG.md`, newest version first, written from the
+user's point of view (what changed on screen, not which function moved). Kept
+since 0.11.0 — earlier versions have no notes. Bump `VERSION` and add the entry
+in the same commit, then regenerate `docs/api.json` (the spec carries the
+version).
+
 ### Configuration
 All settings live in `data/config/config.yaml` (loaded by `app/core/config.py`). Three env vars override YAML: `OPENROUTER_API_KEY`, `DATABASE_URL`, `PORT`. The SQLite database is at `data/db/wydatki.db`. Receipt images are stored under `data/uploads/receipts/<expense_id>/`.
 
