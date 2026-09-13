@@ -721,25 +721,7 @@ async function openExpenseModal(expenseId) {
     loadCategoriesSelect("modal-category", expense.category_id, true);
     loadCardsSelect("modal-card", expense.card_id);
 
-    const itemsList = document.getElementById("modal-items-list");
-    if (expense.items && expense.items.length) {
-        itemsList.innerHTML = expense.items.map((item, i) => `
-            <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center p-2 bg-gray-50 rounded">
-                <input type="text" class="flex-1 w-full border rounded px-2 py-1 text-sm" value="${escapeHtml(item.name)}" id="modal-item-${i}-name">
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" value="${item.price}" id="modal-item-${i}-price">
-                    <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="${item.quantity}" id="modal-item-${i}-qty">
-                    <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="modal-item-${i}-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
-                        ${categoryOptionsHtml(item.category_id)}
-                    </select>
-                    <button onclick="this.parentElement.parentElement.remove(); updateModalItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
-        `).join("");
-    } else {
-        itemsList.innerHTML = "";
-    }
-    updateModalItemsTotal();
+    setItems("modal", expense.items);
 
     // Tags
     const tagsContainer = document.getElementById("modal-tags-container");
@@ -852,6 +834,15 @@ function openReceiptFullscreen() {
     document.getElementById("receipt-fullscreen").classList.remove("hidden");
 }
 
+// Draft pokazuje obraz jako data URL prosto z odpowiedzi AI — w przeciwieństwie
+// do edycji nie ma tu blobu do zwolnienia.
+function openDraftReceiptFullscreen() {
+    const src = document.getElementById("draft-receipt-img").src;
+    if (!src) return;
+    document.getElementById("receipt-fullscreen-img").src = src;
+    document.getElementById("receipt-fullscreen").classList.remove("hidden");
+}
+
 function closeReceiptFullscreen() {
     const el = document.getElementById("receipt-fullscreen");
     el.classList.add("hidden");
@@ -867,123 +858,302 @@ function closeExpenseModal(force = false) {
     if (currentReceiptBlobUrl) { URL.revokeObjectURL(currentReceiptBlobUrl); currentReceiptBlobUrl = null; }
 }
 
-function addModalItem() {
-    const div = document.createElement("div");
-    div.className = "flex flex-col sm:flex-row gap-2 items-start sm:items-center p-2 bg-gray-50 rounded";
-    div.innerHTML = `
-        <input type="text" class="flex-1 w-full border rounded px-2 py-1 text-sm" placeholder="Nazwa" id="modal-item-new-name">
-        <div class="flex gap-2 w-full sm:w-auto">
-            <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" placeholder="Cena" id="modal-item-new-price">
-            <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="1" id="modal-item-new-qty">
-            <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="modal-item-new-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
-                ${categoryOptionsHtml()}
-            </select>
-            <button onclick="this.parentElement.parentElement.remove(); updateModalItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
+// ==================== POZYCJE WYDATKU (draft AI + edycja) ====================
+// Pozycje żyją w tablicy, nie w DOM-ie. Wcześniej odczytywało się je po
+// indeksach pól (`inputs[1]` = cena, `inputs[2]` = ilość), więc każda zmiana
+// układu wiersza po cichu psuła zapis — w obu modalach naraz, bo kolektor był
+// wspólny. Teraz DOM jest tylko widokiem stanu.
+//
+// Wiersz jest zwinięty i czytelny; formularz rozwija się dopiero po kliknięciu,
+// jak w aplikacji androidowej. Cena i ilość dostają wtedy etykiety — w rzędzie
+// czterech pól bez opisów nie dało się odróżnić jednego od drugiego.
+
+const ITEMS_CTX = {
+    modal: { list: "modal-items-list", total: "modal-items-total", amount: "modal-amount" },
+    draft: { list: "draft-items-list", total: "draft-items-total", amount: "draft-amount" },
+};
+
+// Cena i ilość zostają tekstem, dopóki użytkownik pisze — parsujemy dopiero przy
+// odczycie. Gdyby trzymać je jako liczby, "-" albo "0," znikałoby spod palców.
+const itemsState = {
+    modal: { items: [], expanded: -1 },
+    draft: { items: [], expanded: -1 },
+};
+
+function _blankItem() {
+    return { name: "", price: "", quantity: "1", category_id: "" };
+}
+
+function _num(value, fallback) {
+    const n = parseFloat(String(value).replace(",", "."));
+    return isNaN(n) ? fallback : n;
+}
+
+// Ujemna cena to rabat albo zwrot, więc suma bywa mniejsza od pojedynczej
+// pozycji, a nawet ujemna. Ilość pusta znaczy jedną sztukę.
+function _itemTotal(item) {
+    return _num(item.price, 0) * _num(item.quantity, 1);
+}
+
+function _itemCategory(item) {
+    if (item.category_id === "" || item.category_id == null) return null;
+    const id = Number(item.category_id);
+    return categoriesCache.find((c) => c.id === id) || null;
+}
+
+function _money(value) {
+    return `${value.toFixed(2)} zł`;
+}
+
+// Ilość pokazujemy tylko wtedy, gdy różna od jednej — "1 × 19,00" to sam szum.
+function _itemSubline(item) {
+    const category = _itemCategory(item);
+    const qty = _num(item.quantity, 1);
+    const parts = [];
+    if (qty !== 1) parts.push(`${qty} × ${_money(_num(item.price, 0))}`);
+    parts.push(category ? escapeHtml(category.name) : "bez kategorii");
+    const tone = category ? "text-gray-500" : "text-danger";
+    return `<span class="${tone}">${parts.join(" · ")}</span>`;
+}
+
+function setItems(ctx, items) {
+    itemsState[ctx] = {
+        items: (items || []).map((it) => ({
+            name: it.name || "",
+            price: it.price != null ? String(it.price) : "",
+            quantity: it.quantity != null ? String(it.quantity) : "1",
+            category_id: it.category_id != null ? String(it.category_id) : "",
+        })),
+        expanded: -1,
+    };
+    renderItems(ctx);
+}
+
+function addItem(ctx) {
+    const st = itemsState[ctx];
+    st.items.push(_blankItem());
+    st.expanded = st.items.length - 1; // nowa pozycja od razu otwarta do wpisania
+    renderItems(ctx);
+    const nameInput = document.getElementById(`${ctx}-item-name-${st.expanded}`);
+    if (nameInput) nameInput.focus();
+}
+
+function removeItem(ctx, index) {
+    const st = itemsState[ctx];
+    st.items.splice(index, 1);
+    st.expanded = -1;
+    renderItems(ctx);
+}
+
+function toggleItem(ctx, index) {
+    const st = itemsState[ctx];
+    st.expanded = st.expanded === index ? -1 : index;
+    renderItems(ctx);
+}
+
+// Pisanie w polu nie przerysowuje edytora — inaczej kursor skakałby po każdym
+// znaku. Odświeżamy tylko podsumowanie wiersza i sumę pozycji.
+function updateItemField(ctx, index, field, value) {
+    const item = itemsState[ctx].items[index];
+    if (!item) return;
+    item[field] = value;
+    _refreshItemRow(ctx, index);
+    updateItemsTotalFor(ctx);
+}
+
+// Wybór kategorii w pozycji. Opcja "dodaj nową" otwiera osobny formularz, który
+// trzyma referencję do tego selecta — dlatego wtedy nie przerysowujemy listy.
+function onItemCategoryChange(ctx, index, selectEl) {
+    if (selectEl.value === NEW_CATEGORY_OPTION) {
+        handleCategorySelectChange(selectEl);
+        return;
+    }
+    selectEl.dataset.prev = selectEl.value;
+    updateItemField(ctx, index, "category_id", selectEl.value);
+}
+
+function _refreshItemRow(ctx, index) {
+    const item = itemsState[ctx].items[index];
+    if (!item) return;
+
+    const name = document.getElementById(`${ctx}-item-label-${index}`);
+    if (name) {
+        name.textContent = item.name.trim() || "(bez nazwy)";
+        name.classList.toggle("text-gray-500", !item.name.trim());
+    }
+
+    const sub = document.getElementById(`${ctx}-item-sub-${index}`);
+    if (sub) sub.innerHTML = _itemSubline(item);
+
+    const total = document.getElementById(`${ctx}-item-total-${index}`);
+    if (total) {
+        const value = _itemTotal(item);
+        total.textContent = _money(value);
+        total.classList.toggle("text-danger", value < 0);
+    }
+
+    const icon = document.getElementById(`${ctx}-item-icon-${index}`);
+    if (icon) {
+        const { color, icon: glyph } = categoryStyle(
+            _itemCategory(item) ? Number(item.category_id) : "—"
+        );
+        icon.className = `fas ${glyph} text-[11px]`;
+        icon.style.color = color;
+    }
+}
+
+function renderItems(ctx) {
+    const list = document.getElementById(ITEMS_CTX[ctx].list);
+    if (!list) return;
+    const st = itemsState[ctx];
+
+    if (!st.items.length) {
+        list.innerHTML = `<p class="text-xs text-gray-500 py-2">Brak pozycji</p>`;
+        updateItemsTotalFor(ctx);
+        return;
+    }
+
+    list.innerHTML = st.items
+        .map((item, i) => _itemRowHtml(ctx, item, i, st.expanded === i))
+        .join("");
+    updateItemsTotalFor(ctx);
+}
+
+function _itemRowHtml(ctx, item, i, expanded) {
+    const { color, icon } = categoryStyle(
+        _itemCategory(item) ? Number(item.category_id) : "—"
+    );
+    const label = item.name.trim() || "(bez nazwy)";
+    const value = _itemTotal(item);
+
+    return `
+    <div class="border-b border-gray-200 last:border-b-0">
+      <button type="button" onclick="toggleItem('${ctx}', ${i})" aria-expanded="${expanded}"
+        class="w-full flex items-center gap-3 text-left py-2 px-1 rounded hover:bg-surface-2 transition-colors">
+        <span class="shrink-0 w-7 h-7 rounded-full bg-surface-2 flex items-center justify-center">
+          <i id="${ctx}-item-icon-${i}" class="fas ${escapeHtml(icon)} text-[11px]" style="color:${escapeHtml(color)}"></i>
+        </span>
+        <span class="flex-1 min-w-0">
+          <span id="${ctx}-item-label-${i}" class="block text-sm truncate ${item.name.trim() ? "" : "text-gray-500"}">${escapeHtml(label)}</span>
+          <span id="${ctx}-item-sub-${i}" class="block text-xs truncate">${_itemSubline(item)}</span>
+        </span>
+        <span id="${ctx}-item-total-${i}" class="text-sm font-medium shrink-0 ${value < 0 ? "text-danger" : ""}">${_money(value)}</span>
+        <i class="fas fa-chevron-${expanded ? "up" : "down"} text-[10px] text-gray-400 shrink-0"></i>
+      </button>
+      ${expanded ? _itemEditorHtml(ctx, item, i) : ""}
+    </div>`;
+}
+
+function _itemEditorHtml(ctx, item, i) {
+    const field = "w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary";
+    const labelCls = "block text-xs font-medium text-gray-500 mb-1";
+
+    return `
+    <div class="pl-10 pr-1 pb-3 space-y-2">
+      <div>
+        <label class="${labelCls}" for="${ctx}-item-name-${i}">Nazwa</label>
+        <input id="${ctx}-item-name-${i}" type="text" class="${field}" value="${escapeHtml(item.name)}"
+          oninput="updateItemField('${ctx}', ${i}, 'name', this.value)">
+      </div>
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="${labelCls}" for="${ctx}-item-price-${i}">Cena</label>
+          <input id="${ctx}-item-price-${i}" type="number" step="0.01" class="${field}" value="${escapeHtml(item.price)}"
+            oninput="updateItemField('${ctx}', ${i}, 'price', this.value)">
         </div>
-    `;
-    document.getElementById("modal-items-list").appendChild(div);
-    updateModalItemsTotal();
+        <div class="flex-1">
+          <label class="${labelCls}" for="${ctx}-item-qty-${i}">Ilość</label>
+          <input id="${ctx}-item-qty-${i}" type="number" step="0.1" class="${field}" value="${escapeHtml(item.quantity)}"
+            oninput="updateItemField('${ctx}', ${i}, 'quantity', this.value)">
+        </div>
+      </div>
+      <div>
+        <label class="${labelCls}" for="${ctx}-item-cat-${i}">Kategoria</label>
+        <select id="${ctx}-item-cat-${i}" class="${field} js-category-select" data-empty-option="true"
+          onfocus="this.dataset.prev=this.value"
+          onchange="onItemCategoryChange('${ctx}', ${i}, this)">
+          ${categoryOptionsHtml(item.category_id, { includeEmpty: true })}
+        </select>
+      </div>
+      <div class="flex items-center justify-between pt-1">
+        <button type="button" onclick="removeItem('${ctx}', ${i})" class="text-xs text-danger hover:underline">
+          <i class="fas fa-trash mr-1"></i>Usuń pozycję
+        </button>
+        <button type="button" onclick="toggleItem('${ctx}', ${i})" class="text-xs text-primary hover:underline font-medium">
+          Gotowe
+        </button>
+      </div>
+    </div>`;
 }
 
-// --- Suma pozycji (wspólne dla modala edycji i draftu AI) ---
-// Pozycja może mieć ujemną cenę (rabat, zwrot części kosztu przez inną osobę),
-// więc suma bywa mniejsza od pojedynczej pozycji, a nawet ujemna.
-
-function sumItemsList(listId) {
-    let total = 0;
-    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
-        const inputs = div.querySelectorAll("input");
-        const price = parseFloat(inputs[1]?.value);
-        if (isNaN(price)) return;
-        const qty = parseFloat(inputs[2]?.value);
-        total += price * (isNaN(qty) ? 1 : qty);
-    });
-    return total;
+function itemsTotal(ctx) {
+    return itemsState[ctx].items.reduce((sum, item) => sum + _itemTotal(item), 0);
 }
 
-// Podświetla ujemne ceny na czerwono, żeby zwrot dało się odróżnić od kosztu.
-function markNegativeItemPrices(listId) {
-    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
-        const priceInput = div.querySelectorAll("input")[1];
-        if (!priceInput) return;
-        priceInput.classList.toggle("text-danger", parseFloat(priceInput.value) < 0);
-    });
-}
+// Suma milczy, dopóki zgadza się z kwotą wydatku — odzywa się tylko wtedy, gdy
+// jest o czym mówić. Wcześniej wisiała zawsze i na wąskim ekranie bywała ucięta.
+function updateItemsTotalFor(ctx) {
+    const el = document.getElementById(ITEMS_CTX[ctx].total);
+    if (!el) return;
 
-// Pokazuje sumę pozycji, a gdy różni się od kwoty wydatku — przycisk przeliczenia.
-function updateItemsTotal(listId, totalId, amountId) {
-    markNegativeItemPrices(listId);
-
-    const totalEl = document.getElementById(totalId);
-    if (!totalEl) return;
-    if (!document.querySelector(`#${listId} > div`)) {
-        totalEl.innerHTML = "";
+    const amountEl = document.getElementById(ITEMS_CTX[ctx].amount);
+    if (!itemsState[ctx].items.length || !amountEl) {
+        el.innerHTML = "";
         return;
     }
 
-    const total = sumItemsList(listId);
-    const label = `Suma pozycji: ${total.toFixed(2)} zł`;
-    const amount = parseFloat(document.getElementById(amountId).value);
-
+    const total = itemsTotal(ctx);
+    const amount = parseFloat(amountEl.value);
     if (isNaN(amount) || Math.abs(total - amount) <= 0.005) {
-        totalEl.innerHTML = escapeHtml(label);
+        el.innerHTML = "";
         return;
     }
-    totalEl.innerHTML = `
-        <span class="text-warning">${escapeHtml(label)}</span>
-        <button type="button" onclick="applyItemsTotal('${listId}', '${amountId}')"
+
+    el.innerHTML = `<span class="text-warning">Suma pozycji ${escapeHtml(_money(total))} ≠ kwota</span>
+        <button type="button" onclick="applyItemsTotalTo('${ctx}')"
             class="ml-2 text-primary hover:underline font-medium">Ustaw jako kwotę</button>`;
 }
 
-function applyItemsTotal(listId, amountId) {
-    document.getElementById(amountId).value = sumItemsList(listId).toFixed(2);
-    document.getElementById(amountId).dispatchEvent(new Event("input", { bubbles: true }));
+function applyItemsTotalTo(ctx) {
+    const amountEl = document.getElementById(ITEMS_CTX[ctx].amount);
+    amountEl.value = itemsTotal(ctx).toFixed(2);
+    amountEl.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function updateModalItemsTotal() {
-    updateItemsTotal("modal-items-list", "modal-items-total", "modal-amount");
-}
-
-function updateDraftItemsTotal() {
-    updateItemsTotal("draft-items-list", "draft-items-total", "draft-amount");
-}
-
-// Delegacja na document — listy pozycji są przebudowywane przez innerHTML,
-// a widoki podmieniane, więc listener wpięty w konkretny element by odpadł.
+// Kwota wydatku żyje poza listą, a suma pozycji się do niej odnosi.
 document.addEventListener("input", (e) => {
-    if (e.target.closest("#modal-items-list") || e.target.id === "modal-amount") {
-        updateModalItemsTotal();
-    } else if (e.target.closest("#draft-items-list") || e.target.id === "draft-amount") {
-        updateDraftItemsTotal();
-    }
+    if (e.target.id === "modal-amount") updateItemsTotalFor("modal");
+    else if (e.target.id === "draft-amount") updateItemsTotalFor("draft");
 });
 
-// Zbiera pozycje z listy. Zwraca null (i pokazuje toast), jeśli któraś ma
-// cenę zerową lub niepoprawną — backend odrzuciłby to komunikatem po angielsku.
-function collectItemsFromList(listId) {
-    const items = [];
+// Zwraca pozycje do zapisu albo null (i pokazuje toast), gdy któraś ma cenę
+// zerową lub niepoprawną — backend odrzuciłby to komunikatem po angielsku.
+// Pozycje bez nazwy pomijamy po cichu: to puste wiersze, nie błąd.
+function getItems(ctx) {
+    const out = [];
     let invalid = null;
-    document.querySelectorAll(`#${listId} > div`).forEach((div) => {
-        const inputs = div.querySelectorAll("input, select");
-        const name = inputs[0].value.trim();
+
+    itemsState[ctx].items.forEach((item) => {
+        const name = item.name.trim();
         if (!name) return;
-        const price = parseFloat(inputs[1].value);
+        const price = _num(item.price, NaN);
         if (isNaN(price) || price === 0) {
             invalid = invalid || name;
             return;
         }
-        items.push({
+        out.push({
             name,
             price,
-            quantity: parseFloat(inputs[2].value) || 1,
-            category_id: inputs[3].value || null,
+            quantity: _num(item.quantity, 1) || 1,
+            category_id: item.category_id || null,
         });
     });
+
     if (invalid) {
         showToast(`Pozycja "${invalid}" musi mieć cenę różną od zera (ujemna = rabat/zwrot)`, "error");
         return null;
     }
-    return items;
+    return out;
 }
 
 // Kwota 0 to najczęściej literówka (np. "00" zamiast "100"), ale bywa
@@ -994,7 +1164,7 @@ function confirmZeroAmount(amount) {
 }
 
 async function saveExpenseModal() {
-    const items = collectItemsFromList("modal-items-list");
+    const items = getItems("modal");
     if (items === null) return;
 
     const modalAmount = parseFloat(document.getElementById("modal-amount").value);
@@ -1112,6 +1282,9 @@ async function analyzeReceipt() {
 
     const formData = new FormData();
     formData.append("file", file);
+    // Wydatek jeszcze nie istnieje, więc przetworzonego zdjęcia nie da się
+    // później pobrać po id — wraca tą samą odpowiedzią.
+    formData.append("include_preview", "true");
 
     try {
         const response = await fetch(`${API_URL}/ai/receipt`, {
@@ -1170,26 +1343,20 @@ function showDraft(draft) {
     loadCategoriesSelect("draft-category", draft.category_id, true);
     loadCardsSelect("draft-card", draft.card_id);
 
-    const itemsDiv = document.getElementById("draft-items-list");
-    if (draft.items && draft.items.length) {
-        document.getElementById("draft-items-section").classList.remove("hidden");
-        itemsDiv.innerHTML = draft.items.map((item, i) => `
-            <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center p-2 bg-gray-50 rounded">
-                <input type="text" class="flex-1 w-full border rounded px-2 py-1 text-sm" value="${escapeHtml(item.name)}" id="draft-item-${i}-name">
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" value="${item.price}" id="draft-item-${i}-price">
-                    <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="${item.quantity}" id="draft-item-${i}-qty">
-                    <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" id="draft-item-${i}-cat" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
-                        ${categoryOptionsHtml(item.category_id)}
-                    </select>
-                    <button onclick="this.parentElement.parentElement.remove(); updateDraftItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
-                </div>
-            </div>
-        `).join("");
+    const receiptSection = document.getElementById("draft-receipt-section");
+    const receiptImg = document.getElementById("draft-receipt-img");
+    if (draft.receipt_preview) {
+        receiptImg.src = draft.receipt_preview;
+        receiptSection.classList.remove("hidden");
     } else {
-        document.getElementById("draft-items-section").classList.add("hidden");
+        receiptImg.removeAttribute("src");
+        receiptSection.classList.add("hidden");
     }
-    updateDraftItemsTotal();
+
+    document.getElementById("draft-items-section").classList.toggle(
+        "hidden", !(draft.items && draft.items.length)
+    );
+    setItems("draft", draft.items);
 
     // Tags
     document.getElementById("draft-tags-container").innerHTML = "";
@@ -1216,26 +1383,8 @@ function showDraft(draft) {
     document.getElementById("draft-modal").classList.remove("hidden");
 }
 
-function addDraftItem() {
-    const div = document.createElement("div");
-    div.className = "flex flex-col sm:flex-row gap-2 items-start sm:items-center p-2 bg-gray-50 rounded";
-    div.innerHTML = `
-        <input type="text" class="flex-1 w-full border rounded px-2 py-1 text-sm" placeholder="Nazwa">
-        <div class="flex gap-2 w-full sm:w-auto">
-            <input type="number" step="0.01" class="w-24 border rounded px-2 py-1 text-sm" placeholder="Cena">
-            <input type="number" step="0.1" class="w-20 border rounded px-2 py-1 text-sm" value="1">
-            <select class="w-32 border rounded px-2 py-1 text-sm js-category-select" onfocus="this.dataset.prev=this.value" onchange="handleCategorySelectChange(this)">
-                ${categoryOptionsHtml()}
-            </select>
-            <button onclick="this.parentElement.parentElement.remove(); updateDraftItemsTotal();" class="text-danger"><i class="fas fa-times"></i></button>
-        </div>
-    `;
-    document.getElementById("draft-items-list").appendChild(div);
-    updateDraftItemsTotal();
-}
-
 async function saveDraftExpense() {
-    const items = collectItemsFromList("draft-items-list");
+    const items = getItems("draft");
     if (items === null) return;
 
     const draftAmount = parseFloat(document.getElementById("draft-amount").value);
@@ -1280,6 +1429,9 @@ function discardDraft() {
     currentDraft = null;
     currentReceiptFile = null;
     document.getElementById("draft-modal").classList.add("hidden");
+    const draftImg = document.getElementById("draft-receipt-img");
+    if (draftImg) draftImg.removeAttribute("src");
+    document.getElementById("draft-receipt-section").classList.add("hidden");
     // Reset upload area in add-expense view
     const uploadArea = document.getElementById("receipt-upload-area");
     if (uploadArea) uploadArea.classList.remove("hidden");
@@ -1379,7 +1531,12 @@ async function submitInlineCategory() {
         }
         const target = pendingCategorySelect;
         refreshCategorySelects();
-        if (target) target.value = created.id;
+        if (target) {
+            target.value = created.id;
+            // Select pozycji trzyma swój stan w tablicy, nie w DOM-ie —
+            // bez tego zdarzenia wybór zostałby tylko na ekranie.
+            target.dispatchEvent(new Event("change", { bubbles: true }));
+        }
         closeInlineCategoryForm();
         showToast("Kategoria dodana!", "success");
     } catch (e) {

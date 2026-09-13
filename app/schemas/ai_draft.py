@@ -74,6 +74,18 @@ class ExpenseDraft(BaseModel):
         None, description="Ścieżka do przetworzonego zdjęcia paragonu"
     )
 
+    # Podgląd przetworzonego zdjęcia — wypełniany tylko na żądanie klienta
+    # (`include_preview`). Draft powstaje zanim wydatek istnieje, więc nie ma
+    # czego pytać przez GET /receipts/{id}/receipt; obraz wraca tą samą drogą,
+    # ale domyślnie nie, żeby nie dokładać pół megabajta do każdego skanu.
+    receipt_preview: Optional[str] = Field(
+        None,
+        description=(
+            "Przetworzone zdjęcie paragonu jako data URL (`data:image/jpeg;base64,...`). "
+            "Wypełniane tylko gdy klient wyśle `include_preview=true`."
+        ),
+    )
+
     # Ostrzeżenia
     duplicate_warnings: List[DraftDuplicateWarning] = Field(
         default_factory=list,

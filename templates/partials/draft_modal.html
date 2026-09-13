@@ -77,14 +77,24 @@
             </div>
           </div>
 
+          <div id="draft-receipt-section" class="hidden">
+            <label class="block text-xs font-medium text-gray-500 mb-2">Zdjęcie wysłane do AI</label>
+            <div class="flex justify-center">
+              <img id="draft-receipt-img"
+                class="max-h-40 w-auto rounded-lg shadow cursor-pointer hover:opacity-90 transition-opacity border border-gray-200"
+                onclick="openDraftReceiptFullscreen()"
+                title="Kliknij aby powiększyć" />
+            </div>
+          </div>
+
           <div id="draft-items-section" class="hidden">
             <div class="flex items-center justify-between mb-2">
               <label class="block text-xs font-medium text-gray-500">Pozycje na paragonie</label>
               <span id="draft-items-total" class="text-xs text-gray-500"></span>
             </div>
-            <div id="draft-items-list" class="space-y-2"></div>
+            <div id="draft-items-list"></div>
             <div class="mt-2 flex items-center justify-between gap-2">
-              <button onclick="addDraftItem()" class="text-sm text-primary hover:underline">
+              <button onclick="addItem('draft')" class="text-sm text-primary hover:underline">
                 <i class="fas fa-plus mr-1"></i>Dodaj pozycję
               </button>
               <span class="text-xs text-gray-500">ujemna cena = rabat lub zwrot</span>

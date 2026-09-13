@@ -3388,6 +3388,12 @@
             "title": "Already Cropped",
             "description": "Klient zgłasza, że paragon jest już wykadrowany — backend pominie detekcję",
             "default": false
+          },
+          "include_preview": {
+            "type": "boolean",
+            "title": "Include Preview",
+            "description": "Dołącz przetworzone zdjęcie do odpowiedzi (`receipt_preview`), żeby klient mógł je pokazać przed zapisem wydatku",
+            "default": false
           }
         },
         "type": "object",
@@ -4159,6 +4165,18 @@
             ],
             "title": "Receipt Image Path",
             "description": "Ścieżka do przetworzonego zdjęcia paragonu"
+          },
+          "receipt_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Preview",
+            "description": "Przetworzone zdjęcie paragonu jako data URL (`data:image/jpeg;base64,...`). Wypełniane tylko gdy klient wyśle `include_preview=true`."
           },
           "duplicate_warnings": {
             "items": {

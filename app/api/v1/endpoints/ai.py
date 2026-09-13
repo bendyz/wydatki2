@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import Optional
 
@@ -9,10 +10,30 @@ from app.api.v1.endpoints.auth import get_current_user
 from app.db.session import get_db
 from app.models.models import User
 from app.schemas.ai_draft import ExpenseDraft
-from app.services.ai_service import parse_receipt_image, parse_text_expense
+from app.services.ai_service import (
+    _encode_image_to_base64,
+    parse_receipt_image,
+    parse_text_expense,
+)
 from app.services.image_service import save_and_process_receipt_image
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+def _preview_data_url(image_path: str) -> Optional[str]:
+    """
+    Przetworzone zdjęcie jako data URL do pokazania w modalu draftu.
+
+    Brak pliku degraduje do braku podglądu, nie do błędu — draft jest tu
+    rzeczą istotną, a miniatura dodatkiem.
+    """
+    try:
+        return "data:image/jpeg;base64," + _encode_image_to_base64(image_path)
+    except OSError:
+        logger.warning("Nie udało się odczytać podglądu paragonu: %s", image_path)
+        return None
 
 
 class TextExpenseRequest(BaseModel):
@@ -37,6 +58,13 @@ async def analyze_receipt(
     already_cropped: bool = Form(
         False,
         description="Klient zgłasza, że paragon jest już wykadrowany — backend pominie detekcję",
+    ),
+    include_preview: bool = Form(
+        False,
+        description=(
+            "Dołącz przetworzone zdjęcie do odpowiedzi (`receipt_preview`), "
+            "żeby klient mógł je pokazać przed zapisem wydatku"
+        ),
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -81,6 +109,9 @@ async def analyze_receipt(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Nieoczekiwany błąd podczas analizy AI: {str(e)}",
         )
+
+    if include_preview:
+        draft.receipt_preview = _preview_data_url(temp_path)
 
     return draft
 
