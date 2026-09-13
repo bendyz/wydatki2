@@ -438,26 +438,37 @@ function updateFilterSummary(hasMore) {
     summary.classList.remove("hidden");
 }
 
+// Jedyne miejsce, które wysyła paragon do AI. Ten sam fetch był wcześniej
+// przeklejony w dwóch wejściach — z pulpitu i z zakładki dodawania wydatku —
+// więc dołożenie `include_preview` tylko w jednym po cichu wyłączyło podgląd
+// w drugim. Trzecie wejście dostanie komplet samo z siebie.
+async function requestReceiptDraft(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    // Wydatek jeszcze nie istnieje, więc przetworzonego zdjęcia nie da się
+    // później pobrać po id — wraca tą samą odpowiedzią.
+    formData.append("include_preview", "true");
+
+    const response = await fetch(`${API_URL}/ai/receipt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: formData,
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: "Błąd analizy AI" }));
+        throw new Error(err.detail || "Błąd analizy AI");
+    }
+    return response.json();
+}
+
 // ==================== DASHBOARD AI QUICK ADD ====================
 async function dashboardReceiptSelected(file) {
     if (!file) return;
     currentReceiptFile = file;
     const loading = document.getElementById("dash-ai-loading");
     loading.classList.remove("hidden");
-    const formData = new FormData();
-    formData.append("file", file);
     try {
-        const response = await fetch(`${API_URL}/ai/receipt`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${getToken()}` },
-            body: formData,
-        });
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({ detail: "Błąd analizy AI" }));
-            throw new Error(err.detail || "Błąd analizy AI");
-        }
-        const draft = await response.json();
-        showDraft(draft);
+        showDraft(await requestReceiptDraft(file));
     } catch (e) {
         currentReceiptFile = null;
         showToast(e.message, "error");
@@ -1280,24 +1291,8 @@ async function analyzeReceipt() {
     document.getElementById("receipt-loading").classList.remove("hidden");
     document.getElementById("receipt-preview").classList.add("hidden");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    // Wydatek jeszcze nie istnieje, więc przetworzonego zdjęcia nie da się
-    // później pobrać po id — wraca tą samą odpowiedzią.
-    formData.append("include_preview", "true");
-
     try {
-        const response = await fetch(`${API_URL}/ai/receipt`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${getToken()}` },
-            body: formData,
-        });
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({ detail: "Błąd analizy AI" }));
-            throw new Error(err.detail || "Błąd analizy AI");
-        }
-        const draft = await response.json();
-        showDraft(draft);
+        showDraft(await requestReceiptDraft(file));
     } catch (e) {
         showToast(e.message, "error");
     } finally {
