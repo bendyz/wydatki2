@@ -3,6 +3,31 @@
 Notatki wydaniowe prowadzone od wersji 0.11.0. Opisują zmiany widoczne dla
 użytkownika — szczegóły techniczne są w historii gita.
 
+## 0.12.0 — 2026-09-20
+
+### Import wyciągu bankowego
+
+W „Dodaj wydatek" doszła czwarta zakładka: **Import wyciągu**. Wrzucasz
+eksport operacji z mBanku (CSV) i dostajesz listę obciążeń porównaną z tym,
+co już masz zapisane — po kwocie co do grosza i dacie z tolerancją jednego
+dnia, bez udziału AI:
+
+- **zielony** — wydatek już jest w bazie,
+- **żółty** — niepewne, np. w wyciągu są dwie operacje po 10 zł, a w bazie
+  jedna; pod wierszem widać, co dokładnie jest w bazie, żeby dało się
+  rozstrzygnąć,
+- **pomarańczowy** — nic takiego nie ma.
+
+Przy żółtych i pomarańczowych jest przycisk „Dodaj": otwiera okienko z gotowym
+opisem (data, kwota, opis z wyciągu, kategoria banku), który można poprawić,
+a potem AI proponuje wydatek jak przy opisie tekstowym. Po zapisie wiersz
+zmienia kolor na zielony. Wpływy są pomijane.
+
+Nic nie zapisuje się samo — import tylko pokazuje, czego brakuje.
+
+Dla klientów zewnętrznych: `POST /api/v1/import/bank-csv` zwraca tę samą listę
+ze statusami `matched` / `ambiguous` / `missing`.
+
 ## 0.11.0 — 2026-09-13
 
 ### Czytelna lista pozycji na paragonie

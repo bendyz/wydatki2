@@ -1218,7 +1218,7 @@ async function deleteExpenseModal() {
 
 // ==================== ADD EXPENSE ====================
 function showExpenseTab(tab) {
-    ["manual", "receipt", "text"].forEach((t) => {
+    ["manual", "receipt", "text", "import"].forEach((t) => {
         document.getElementById(`expense-tab-${t}`).classList.add("hidden");
         const btn = document.getElementById(`tab-${t}`);
         btn.classList.remove("border-primary", "text-primary");
@@ -1317,6 +1317,118 @@ async function analyzeTextExpense() {
     }
 }
 
+// ==================== BANK STATEMENT IMPORT ====================
+let importRows = [];
+let importSkippedIncome = 0;
+let importAddIndex = null; // wiersz, dla którego otwarto draft — po zapisie przechodzi w "matched"
+
+const IMPORT_STATUS = {
+    matched: { label: "w bazie", bar: "bg-green-500", chip: "bg-green-100 text-green-800" },
+    ambiguous: { label: "niepewne", bar: "bg-yellow-500", chip: "bg-yellow-100 text-yellow-800" },
+    missing: { label: "brak", bar: "bg-orange-500", chip: "bg-orange-100 text-orange-800" },
+};
+
+async function importBankCsv() {
+    const input = document.getElementById("import-file-input");
+    if (!input.files.length) return showToast("Wybierz plik CSV", "warning");
+
+    const form = new FormData();
+    form.append("file", input.files[0]);
+    form.append("bank", "mbank");
+    document.getElementById("import-loading").classList.remove("hidden");
+    try {
+        const res = await apiRequest("POST", "/import/bank-csv", form, true);
+        importRows = res.rows;
+        importSkippedIncome = res.summary.skipped_income;
+        renderImportSummary();
+        renderImportRows();
+    } catch (e) {
+        showToast(e.message, "error");
+    } finally {
+        document.getElementById("import-loading").classList.add("hidden");
+    }
+}
+
+function renderImportSummary() {
+    const counts = { matched: 0, ambiguous: 0, missing: 0 };
+    importRows.forEach((r) => counts[r.status]++);
+    const el = document.getElementById("import-summary");
+    el.classList.remove("hidden");
+    el.innerHTML = Object.entries(IMPORT_STATUS)
+        .map(([k, v]) => `<span class="px-2 py-1 rounded-full ${v.chip}">${v.label}: ${counts[k]}</span>`)
+        .join("") +
+        (importSkippedIncome ? `<span class="px-2 py-1 rounded-full bg-gray-100 text-gray-600">wpływy pominięte: ${importSkippedIncome}</span>` : "");
+}
+
+function renderImportRows() {
+    document.getElementById("import-rows").innerHTML = importRows.map((r, i) => {
+        const st = IMPORT_STATUS[r.status];
+        const candidates = r.status === "ambiguous" && r.candidates.length
+            ? `<div class="mt-2 pl-3 border-l-2 border-yellow-300 text-xs text-gray-600 space-y-0.5">
+                 <div class="font-medium text-yellow-800">W bazie:</div>
+                 ${r.candidates.map((c) => `<div>${c.date} · ${fmtAmount(c.amount)} zł · ${escapeHtml(c.description || "—")}${c.category_name ? ` <span class="text-gray-400">(${escapeHtml(c.category_name)})</span>` : ""}</div>`).join("")}
+               </div>`
+            : "";
+        const addBtn = r.status !== "matched"
+            ? `<button onclick="openImportAdd(${i})" class="shrink-0 bg-primary-solid text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary-solid-hover"><i class="fas fa-plus mr-1"></i>Dodaj</button>`
+            : `<i class="fas fa-check text-green-500 shrink-0 px-2"></i>`;
+        return `
+        <div id="import-row-${i}" class="flex gap-3 rounded-lg border border-gray-200 bg-surface-2 overflow-hidden">
+          <div class="w-1.5 shrink-0 ${st.bar}"></div>
+          <div class="flex-1 min-w-0 py-2 pr-3 flex items-start gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 text-sm">
+                <span class="text-gray-500 tabular-nums">${r.date}</span>
+                <span class="font-semibold text-gray-900 tabular-nums">${fmtAmount(r.amount)} zł</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-medium ${st.chip}">${st.label}</span>
+              </div>
+              <div class="text-xs text-gray-600 truncate" title="${escapeHtml(r.description)}">${escapeHtml(r.description)}</div>
+              ${r.bank_category ? `<div class="text-[11px] text-gray-400">${escapeHtml(r.bank_category)}</div>` : ""}
+              ${candidates}
+            </div>
+            ${addBtn}
+          </div>
+        </div>`;
+    }).join("");
+}
+
+function openImportAdd(i) {
+    const r = importRows[i];
+    importAddIndex = i;
+    document.getElementById("import-add-text").value =
+        `${r.date}, ${fmtAmount(r.amount)} PLN, ${r.description}` +
+        (r.bank_category ? ` (kategoria banku: ${r.bank_category})` : "");
+    document.getElementById("import-add-modal").classList.remove("hidden");
+}
+
+function closeImportAdd() {
+    document.getElementById("import-add-modal").classList.add("hidden");
+}
+
+async function analyzeImportAdd() {
+    const text = document.getElementById("import-add-text").value.trim();
+    if (!text) return;
+    const btn = document.getElementById("import-add-btn");
+    btn.disabled = true;
+    try {
+        const draft = await apiRequest("POST", "/ai/text", { text });
+        closeImportAdd();
+        showDraft(draft);
+    } catch (e) {
+        showToast(e.message, "error");
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function markImportRowAdded() {
+    if (importAddIndex === null) return;
+    importRows[importAddIndex].status = "matched";
+    importAddIndex = null;
+    renderImportRows();
+    renderImportSummary();
+}
+
 // ==================== DRAFT REVIEW (modal) ====================
 function showDraft(draft) {
     currentDraft = draft;
@@ -1413,6 +1525,7 @@ async function saveDraftExpense() {
             }
         }
         showToast("Wydatek zapisany!", "success");
+        markImportRowAdded();
         discardDraft();
         loadExpenses();
     } catch (e) {
@@ -1423,6 +1536,7 @@ async function saveDraftExpense() {
 function discardDraft() {
     currentDraft = null;
     currentReceiptFile = null;
+    importAddIndex = null;
     document.getElementById("draft-modal").classList.add("hidden");
     const draftImg = document.getElementById("draft-receipt-img");
     if (draftImg) draftImg.removeAttribute("src");
@@ -2381,6 +2495,9 @@ async function initApp() {
         }
         if (!document.getElementById("draft-modal").classList.contains("hidden")) {
             discardDraft(); return;
+        }
+        if (!document.getElementById("import-add-modal")?.classList.contains("hidden")) {
+            closeImportAdd(); return;
         }
         if (!document.getElementById("sub-modal")?.classList.contains("hidden")) {
             closeSubModal(); return;

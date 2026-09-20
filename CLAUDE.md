@@ -116,6 +116,7 @@ All REST endpoints under `/api/v1/` (registered in `app/api/v1/router.py`):
 - `/ai/text` — natural language description → OpenRouter LLM → returns `ExpenseDraft` (not saved)
 - `/tags`, `/cards` — CRUD for `Tag` / `PaymentCard` lookup tables
 - `/assets` — asset accounts and snapshots (net worth tracking)
+- `/import/bank-csv` — upload a bank statement CSV → deterministic match against saved expenses (amount + date ±1 day) → rows with `matched`/`ambiguous`/`missing` and DB candidates. Parser per bank in `services/bank_import.py` (`PARSERS` dict) — matching is bank-agnostic
 - `/admin` — administrative endpoints
 
 ### AI draft flow

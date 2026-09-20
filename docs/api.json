@@ -3,7 +3,7 @@
   "info": {
     "title": "Wydatki 2.0",
     "description": "Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/api/v1/auth/registration-status": {
@@ -2939,6 +2939,53 @@
         }
       }
     },
+    "/api/v1/import/bank-csv": {
+      "post": {
+        "tags": [
+          "import"
+        ],
+        "summary": "Porównaj wyciąg bankowy (CSV) z zapisanymi wydatkami",
+        "description": "Wgrywa eksport operacji z banku i dla każdego obciążenia sprawdza deterministycznie (kwota do grosza, data ±1 dzień), czy wydatek jest już w bazie. Zwraca listę operacji ze statusem `matched` / `ambiguous` / `missing` i kandydatami z bazy. Nic nie zapisuje — dodanie brakującej operacji to osobne wywołanie `/ai/text` + `POST /expenses`. Wpływy są pomijane. Obsługiwane banki: mbank",
+        "operationId": "import_bank_csv_api_v1_import_bank_csv_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_bank_csv_api_v1_import_bank_csv_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -3375,6 +3422,31 @@
         ],
         "title": "AssetVerifyResponse"
       },
+      "BankImportResponse": {
+        "properties": {
+          "bank": {
+            "type": "string",
+            "title": "Bank"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ImportSummary"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bank",
+          "summary",
+          "rows"
+        ],
+        "title": "BankImportResponse"
+      },
       "Body_analyze_receipt_api_v1_ai_receipt_post": {
         "properties": {
           "file": {
@@ -3401,6 +3473,27 @@
           "file"
         ],
         "title": "Body_analyze_receipt_api_v1_ai_receipt_post"
+      },
+      "Body_import_bank_csv_api_v1_import_bank_csv_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Plik CSV wyeksportowany z banku"
+          },
+          "bank": {
+            "type": "string",
+            "title": "Bank",
+            "description": "Format wyciągu: mbank",
+            "default": "mbank"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_bank_csv_api_v1_import_bank_csv_post"
       },
       "Body_login_api_v1_auth_login_post": {
         "properties": {
@@ -4604,6 +4697,141 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImportCandidate": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "amount"
+        ],
+        "title": "ImportCandidate",
+        "description": "Wydatek z bazy o tej samej kwocie w oknie ±1 dzień od operacji"
+      },
+      "ImportRow": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date",
+            "description": "Data operacji z wyciągu"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Kwota obciążenia (dodatnia), PLN"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Opis operacji z wyciągu, zwinięte białe znaki"
+          },
+          "bank_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Category",
+            "description": "Kategoria nadana przez bank"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "ambiguous",
+              "missing"
+            ],
+            "title": "Status",
+            "description": "matched — tyle samo wydatków w bazie co operacji w wyciągu (zielony); ambiguous — liczby się nie zgadzają, patrz `candidates` (żółty); missing — brak wydatku o tej kwocie w oknie ±1 dzień (pomarańczowy)"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ImportCandidate"
+            },
+            "type": "array",
+            "title": "Candidates",
+            "description": "Wydatki z bazy, które mogą odpowiadać tej operacji"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "amount",
+          "description",
+          "status"
+        ],
+        "title": "ImportRow",
+        "description": "Jedna operacja z wyciągu wraz z wynikiem porównania z bazą"
+      },
+      "ImportSummary": {
+        "properties": {
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "ambiguous": {
+            "type": "integer",
+            "title": "Ambiguous"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing"
+          },
+          "skipped_income": {
+            "type": "integer",
+            "title": "Skipped Income",
+            "description": "Wpływy pominięte przy imporcie"
+          }
+        },
+        "type": "object",
+        "required": [
+          "matched",
+          "ambiguous",
+          "missing",
+          "skipped_income"
+        ],
+        "title": "ImportSummary"
       },
       "MonthlySummary": {
         "properties": {
