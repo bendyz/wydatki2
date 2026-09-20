@@ -74,6 +74,8 @@
   --t-red-fg: 251 113 133;    --t-red-fg2: 253 164 175;
   --t-yellow-bg: 58 44 13;    --t-yellow-bg2: 74 58 18;
   --t-yellow-fg: 251 191 36;  --t-yellow-fg2: 252 211 77;
+  --t-orange-bg: 64 34 12;    --t-orange-bg2: 84 44 16;
+  --t-orange-fg: 251 146 60;  --t-orange-fg2: 253 186 116;
   --t-indigo-bg: 32 34 74;    --t-indigo-bg2: 42 45 94;
   --t-indigo-fg: 165 180 252; --t-indigo-fg2: 199 210 254;
   --t-purple-bg: 42 33 80;    --t-purple-bg2: 55 44 102;
@@ -133,6 +135,8 @@
   --t-red-fg: 239 68 68;      --t-red-fg2: 185 28 28;
   --t-yellow-bg: 254 243 199; --t-yellow-bg2: 253 230 138;
   --t-yellow-fg: 245 158 11;  --t-yellow-fg2: 161 98 7;
+  --t-orange-bg: 255 237 213; --t-orange-bg2: 254 215 170;
+  --t-orange-fg: 249 115 22;  --t-orange-fg2: 194 65 12;
   --t-indigo-bg: 224 231 255; --t-indigo-bg2: 199 210 254;
   --t-indigo-fg: 99 102 241;  --t-indigo-fg2: 67 56 202;
   --t-purple-bg: 243 232 255; --t-purple-bg2: 233 213 255;
