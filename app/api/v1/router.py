@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     ai,
     assets,
     auth,
+    bank_import,
     cards,
     categories,
     expenses,
@@ -29,3 +30,4 @@ api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
 api_router.include_router(cards.router, prefix="/cards", tags=["cards"])
 api_router.include_router(assets.router, prefix="/assets", tags=["assets"])
+api_router.include_router(bank_import.router, prefix="/import", tags=["import"])
