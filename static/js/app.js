@@ -1409,7 +1409,10 @@ async function analyzeImportAdd() {
     const text = document.getElementById("import-add-text").value.trim();
     if (!text) return;
     const btn = document.getElementById("import-add-btn");
+    const label = btn.innerHTML;
     btn.disabled = true;
+    btn.classList.add("opacity-60", "cursor-wait");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Trwa analizowanie…';
     try {
         const draft = await apiRequest("POST", "/ai/text", { text });
         closeImportAdd();
@@ -1418,6 +1421,8 @@ async function analyzeImportAdd() {
         showToast(e.message, "error");
     } finally {
         btn.disabled = false;
+        btn.classList.remove("opacity-60", "cursor-wait");
+        btn.innerHTML = label;
     }
 }
 
