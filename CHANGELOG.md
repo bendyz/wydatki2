@@ -3,6 +3,14 @@
 Notatki wydaniowe prowadzone od wersji 0.11.0. Opisują zmiany widoczne dla
 użytkownika — szczegóły techniczne są w historii gita.
 
+## 0.12.1 — 2026-09-28
+
+### Poprawki
+
+- Lista abonamentów znów się wczytuje. Wcześniej wystarczył jeden abonament
+  ratalny ze spłaconą ostatnią ratą, żeby cała lista kończyła się błędem.
+  Spłacone raty nie pokazują się już wśród aktywnych abonamentów.
+
 ## 0.12.0 — 2026-09-20
 
 ### Import wyciągu bankowego

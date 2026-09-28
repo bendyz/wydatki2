@@ -66,5 +66,7 @@ class SubscriptionResponse(SubscriptionBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # Scheduler schodzi z licznikiem do 0 po ostatniej racie — to stan poprawny.
+    remaining_installments: Optional[int] = Field(None, ge=0)
     id: int
     user_id: int

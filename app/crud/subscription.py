@@ -46,7 +46,9 @@ def get_subscriptions(
     if active_only:
         today = date.today()
         query = query.filter(
-            (Subscription.end_date.is_(None)) | (Subscription.end_date >= today)
+            (Subscription.end_date.is_(None)) | (Subscription.end_date >= today),
+            (Subscription.remaining_installments.is_(None))
+            | (Subscription.remaining_installments > 0),
         )
 
     return query.offset(skip).limit(limit).all()
