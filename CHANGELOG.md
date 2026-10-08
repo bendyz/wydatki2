@@ -3,6 +3,40 @@
 Notatki wydaniowe prowadzone od wersji 0.11.0. Opisują zmiany widoczne dla
 użytkownika — szczegóły techniczne są w historii gita.
 
+## 0.13.0 — 2026-10-08
+
+### Kredyty w module Majątek
+
+Przy dodawaniu konta jest nowy typ **Kredyt** (np. hipoteka). Wpisujesz w nim
+saldo pozostałe do spłaty — kwotą dodatnią, tak jak widzisz ją w banku — i
+dodajesz kolejne wpisy po każdej racie.
+
+- Kredyt jest odejmowany od sumy: nagłówek to teraz **Majątek netto**
+  (aktywa minus kredyty), a pod nim, gdy masz jakiś dług, widać „Do spłaty".
+- Na liście kont kredyt ma kwotę na czerwono ze znakiem minus.
+- Lista kont jest ułożona według rodzaju: najpierw konta bankowe, gotówka i
+  oszczędności, potem inwestycje (ETF, krypto, waluty), inne, a kredyty
+  zawsze na dole.
+- Wykres sumy pokazuje majątek netto, a linia kredytu leży pod zerem (na
+  minusie).
+
+### Dla aplikacji Android
+
+Spec API (`docs/api.json`) zmienia się tylko o jedno pole; nowy typ konta to
+zwykły string. Do zrobienia po stronie apki:
+
+1. Nowa wartość `account_type = "loan"` — dodać do listy typów w formularzu
+   konta (etykieta „Kredyt", ikona domu) i do mapowania etykiet/ikon.
+2. `GET /assets/summary` → każdy punkt ma nowe pole `debt` (suma sald
+   kredytów, dodatnia); `total` oznacza teraz majątek **netto**. Zmienić
+   etykietę „Łącznie" na „Majątek netto" i pokazać „Do spłaty: {debt}", gdy
+   `debt > 0`.
+3. Kwoty wpisów kredytu są **dodatnie** i tak mają być wysyłane w
+   `POST /assets/accounts/{id}/snapshots`. Odejmowanie robi serwer, apka ma
+   tylko pokazać kwotę kredytu ze znakiem minus / na czerwono.
+4. Starsze wersje apki działają dalej, ale nieznany typ `loan` pokażą jako
+   zwykłe konto (bez ikony), a „Łącznie" będzie już netto.
+
 ## 0.12.1 — 2026-09-28
 
 ### Poprawki

@@ -3148,11 +3148,11 @@ let _assetsChart = null;
 let _assetAccountsCache = [];
 const ACCOUNT_TYPE_LABELS = {
     cash: "Gotówka", bank: "Konto bankowe", savings: "Oszczędności",
-    etf: "ETF / akcje", crypto: "Kryptowaluty", foreign: "Waluta obca", other: "Inne",
+    etf: "ETF / akcje", crypto: "Kryptowaluty", foreign: "Waluta obca", loan: "Kredyt", other: "Inne",
 };
 const ACCOUNT_TYPE_ICONS = {
     cash: "fa-money-bill-wave", bank: "fa-university", savings: "fa-piggy-bank",
-    etf: "fa-chart-line", crypto: "fa-coins", foreign: "fa-globe", other: "fa-wallet",
+    etf: "fa-chart-line", crypto: "fa-coins", foreign: "fa-globe", loan: "fa-house-chimney", other: "fa-wallet",
 };
 
 async function assetsApiRequest(method, endpoint, body = null) {
@@ -3255,6 +3255,10 @@ function renderAssetsTotal(summary) {
     const lastPoint = summary.points.at(-1);
     const total = lastPoint ? lastPoint.total : 0;
     document.getElementById("assets-total").textContent = _fmtAsset(total);
+    const debt = lastPoint ? lastPoint.debt : 0;
+    const debtEl = document.getElementById("assets-debt");
+    debtEl.textContent = `Do spłaty: ${_fmtAsset(debt)}`;
+    debtEl.classList.toggle("hidden", !debt);
 }
 
 function renderAssetsChart(summary) {
@@ -3288,7 +3292,10 @@ function renderAssetsChart(summary) {
     // Poszczególne konta — cienkie, półprzezroczyste
     const accDatasets = accountIds.map((id, i) => ({
         label: summary.accounts[i].name,
-        data: summary.points.map(p => p.by_account[id] ?? null),
+        data: summary.points.map(p => {
+            const v = p.by_account[id] ?? null;
+            return v != null && summary.accounts[i].account_type === "loan" ? -v : v;  // kredyt na minusie
+        }),
         borderColor: accColors[i % accColors.length],
         backgroundColor: "transparent",
         borderWidth: 1.5,
@@ -3333,8 +3340,13 @@ function renderAssetsChart(summary) {
     });
 }
 
+// Kolejność na liście: konta, potem inwestycje, inne, a na dole kredyty.
+const ACCOUNT_TYPE_ORDER = ["bank", "cash", "savings", "etf", "crypto", "foreign", "other", "loan"];
+const _typeRank = t => { const i = ACCOUNT_TYPE_ORDER.indexOf(t); return i < 0 ? ACCOUNT_TYPE_ORDER.indexOf("other") : i; };
+
 function renderAssetsAccounts(accounts) {
     _assetAccountsCache = accounts;
+    accounts = [...accounts].sort((a, b) => _typeRank(a.account_type) - _typeRank(b.account_type));  // sort stabilny: w typie zostaje sort_order
     const el = document.getElementById("assets-accounts-list");
     if (!accounts.length) {
         el.innerHTML = `<p class="text-sm text-gray-400 text-center py-4">Brak kont. Dodaj pierwsze.</p>`;
@@ -3345,7 +3357,7 @@ function renderAssetsAccounts(accounts) {
         const typeLabel = escapeHtml(ACCOUNT_TYPE_LABELS[acc.account_type] || acc.account_type);
         const currency = escapeHtml(acc.currency);
         const amount = acc.latest_amount != null
-            ? `<span class="text-lg font-bold text-gray-900">${_fmtAsset(acc.latest_amount)} <span class="text-sm font-normal text-gray-400">${currency}</span></span>`
+            ? `<span class="text-lg font-bold ${acc.account_type === "loan" ? "text-danger" : "text-gray-900"}">${acc.account_type === "loan" ? "−" : ""}${_fmtAsset(acc.latest_amount)} <span class="text-sm font-normal text-gray-400">${currency}</span></span>`
             : `<span class="text-sm text-gray-400 italic">brak wpisów</span>`;
         const dateLabel = acc.latest_date ? `<span class="text-xs text-gray-400 ml-2">${acc.latest_date}</span>` : "";
 

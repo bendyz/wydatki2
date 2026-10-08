@@ -22,7 +22,7 @@ class AssetVerifyResponse(BaseModel):
 
 class AssetAccountCreate(BaseModel):
     name: str
-    account_type: str = "other"  # cash / bank / etf / crypto / foreign / other
+    account_type: str = "other"  # cash / bank / savings / etf / crypto / foreign / loan / other
     currency: str = "PLN"
     sort_order: int = 0
 
@@ -67,7 +67,8 @@ class AssetAccountResponse(BaseModel):
 
 class AssetSummaryPoint(BaseModel):
     date: datetime.date
-    total: float
+    total: float  # majątek netto (aktywa − kredyty)
+    debt: float = 0.0  # suma sald kredytów (dodatnia)
     by_account: dict
 
 

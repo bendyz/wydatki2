@@ -238,6 +238,27 @@ def delete_snapshot(
 
 # ── Summary (chart data) ─────────────────────────────────────────────────────
 
+def _build_points(accounts_dec: List[AssetAccountResponse]) -> List[AssetSummaryPoint]:
+    """Kredyty (account_type == "loan") trzymają dodatnie saldo długu; total = aktywa − dług."""
+    all_dates = {s.recorded_at for acc in accounts_dec for s in acc.snapshots}
+    points = []
+    for date in sorted(all_dates):
+        by_account: dict[str, float] = {}
+        assets = debt = 0.0
+        for acc in accounts_dec:
+            snaps_up_to = [s for s in acc.snapshots if s.recorded_at <= date]
+            if not snaps_up_to:
+                continue
+            val = max(snaps_up_to, key=lambda s: s.recorded_at).amount
+            by_account[str(acc.id)] = val
+            if acc.account_type == "loan":
+                debt += val
+            else:
+                assets += val
+        points.append(AssetSummaryPoint(date=date, total=assets - debt, debt=debt, by_account=by_account))
+    return points
+
+
 @router.get("/summary", response_model=AssetSummaryResponse)
 def summary(
     x_asset_password: Optional[str] = Header(default=None),
@@ -248,23 +269,4 @@ def summary(
     accounts = db.query(AssetAccount).filter_by(user_id=current_user.id).order_by(AssetAccount.sort_order).all()
     accounts_dec = [_decrypt_account(a, fernet) for a in accounts]
 
-    # Collect all unique dates across all snapshots
-    all_dates: set[datetime.date] = set()
-    for acc in accounts_dec:
-        for snap in acc.snapshots:
-            all_dates.add(snap.recorded_at)
-
-    points: list[AssetSummaryPoint] = []
-    for date in sorted(all_dates):
-        by_account: dict[str, float] = {}
-        total = 0.0
-        for acc in accounts_dec:
-            # Latest snapshot up to this date
-            snaps_up_to = [s for s in acc.snapshots if s.recorded_at <= date]
-            if snaps_up_to:
-                latest_val = max(snaps_up_to, key=lambda s: s.recorded_at).amount
-                by_account[str(acc.id)] = latest_val
-                total += latest_val
-        points.append(AssetSummaryPoint(date=date, total=total, by_account=by_account))
-
-    return AssetSummaryResponse(points=points, accounts=accounts_dec)
+    return AssetSummaryResponse(points=_build_points(accounts_dec), accounts=accounts_dec)

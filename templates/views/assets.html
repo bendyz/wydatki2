@@ -28,13 +28,14 @@
       <!-- Summary card -->
       <div class="bg-surface rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
         <div class="flex items-center justify-between mb-1">
-          <h2 class="text-sm font-medium text-gray-500">Łącznie</h2>
+          <h2 class="text-sm font-medium text-gray-500">Majątek netto</h2>
           <button onclick="assetsLock()" class="text-xs text-gray-400 hover:text-gray-600">
             <i class="fas fa-lock mr-1"></i>Zablokuj
           </button>
         </div>
-        <p id="assets-total" class="text-3xl font-bold text-gray-900 mb-4">—</p>
-        <canvas id="assets-chart" height="110"></canvas>
+        <p id="assets-total" class="text-3xl font-bold text-gray-900 ">—</p>
+        <p id="assets-debt" class="text-sm text-danger mb-4 hidden"></p>
+        <canvas id="assets-chart" height="143"></canvas>
       </div>
 
       <!-- Accounts list -->
@@ -77,6 +78,7 @@
             <option value="etf">ETF / akcje</option>
             <option value="crypto">Kryptowaluty</option>
             <option value="foreign">Waluta obca</option>
+            <option value="loan">Kredyt (saldo do spłaty)</option>
             <option value="other">Inne</option>
           </select>
         </div>
