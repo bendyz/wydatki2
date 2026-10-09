@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Wydatki 2.0",
+    "title": "Wydatki TEST",
     "description": "Aplikacja do zarządzania wydatkami wspierana przez AI.",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "paths": {
     "/api/v1/auth/registration-status": {
@@ -2345,22 +2345,62 @@
           {
             "name": "year",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
+              "default": 0,
               "title": "Year"
             }
           },
           {
             "name": "month",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "integer",
               "maximum": 12,
               "minimum": 1,
+              "default": 1,
               "title": "Month"
             }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zamiast year/month: początek zakresu (włącznie)",
+              "title": "Date From"
+            },
+            "description": "Zamiast year/month: początek zakresu (włącznie)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zamiast year/month: koniec zakresu (włącznie)",
+              "title": "Date To"
+            },
+            "description": "Zamiast year/month: koniec zakresu (włącznie)"
           }
         ],
         "responses": {
@@ -3687,6 +3727,39 @@
             "type": "boolean",
             "title": "Rules Require All"
           },
+          "yearly_min_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yearly Min Amount"
+          },
+          "issued_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Date"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardYearStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "months": {
             "items": {
               "$ref": "#/components/schemas/CardMonthStats"
@@ -3706,6 +3779,51 @@
           "months"
         ],
         "title": "CardStatsResponse"
+      },
+      "CardYearStats": {
+        "properties": {
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "total_amount": {
+            "type": "number",
+            "title": "Total Amount"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target"
+          },
+          "remaining": {
+            "type": "number",
+            "title": "Remaining"
+          },
+          "percent": {
+            "type": "number",
+            "title": "Percent"
+          },
+          "is_met": {
+            "type": "boolean",
+            "title": "Is Met"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_start",
+          "period_end",
+          "total_amount",
+          "target",
+          "remaining",
+          "percent",
+          "is_met"
+        ],
+        "title": "CardYearStats"
       },
       "CategoryCreate": {
         "properties": {
@@ -4945,6 +5063,32 @@
             "title": "Rules Require All",
             "description": "True=wszystkie warunki (AND), False=dowolny warunek (OR)",
             "default": true
+          },
+          "yearly_min_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yearly Min Amount",
+            "description": "Min. kwota zł w roku (od rocznicy wydania karty)"
+          },
+          "issued_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Date",
+            "description": "Data wydania karty; od jej rocznicy liczy się rok"
           }
         },
         "type": "object",
@@ -5006,6 +5150,32 @@
             "title": "Rules Require All",
             "description": "True=wszystkie warunki (AND), False=dowolny warunek (OR)",
             "default": true
+          },
+          "yearly_min_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yearly Min Amount",
+            "description": "Min. kwota zł w roku (od rocznicy wydania karty)"
+          },
+          "issued_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Date",
+            "description": "Data wydania karty; od jej rocznicy liczy się rok"
           },
           "id": {
             "type": "integer",
@@ -5085,6 +5255,30 @@
               }
             ],
             "title": "Rules Require All"
+          },
+          "yearly_min_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yearly Min Amount"
+          },
+          "issued_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Date"
           }
         },
         "type": "object",

@@ -71,6 +71,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        for col in ("yearly_min_amount FLOAT", "issued_date DATE"):
+            try:
+                conn.execute(text(f"ALTER TABLE payment_cards ADD COLUMN {col}"))
+                conn.commit()
+            except Exception:
+                pass
         # Migrate categories: UNIQUE(name) → UNIQUE(name, user_id)
         row = conn.execute(text(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='categories'"

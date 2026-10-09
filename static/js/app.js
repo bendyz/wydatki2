@@ -2841,6 +2841,8 @@ async function saveAdminConfig(event) {
 
     try {
         await apiRequest("PUT", "/admin/config", payload);
+        document.title = payload.app_name;
+        document.getElementById("brand-name").textContent = payload.app_name;
         showToast("Konfiguracja zapisana", "success");
     } catch (e) {
         showToast("Błąd zapisu: " + e.message, "error");
@@ -2965,6 +2967,19 @@ function renderCardsStats(stats) {
             </tr>`;
 
         const rulesDesc = buildRulesDescription(card);
+        const y = card.year;
+        const yearBar = y ? `
+            <button onclick="openCardPeriodExpenses(${card.id}, '${y.period_start}', '${y.period_end}', '${card.name.replace(/'/g, "\\'")} — rok')"
+                class="block w-full text-left px-4 py-3 border-b hover:bg-surface-2">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="font-semibold text-gray-700"><i class="fas fa-calendar-alt mr-1"></i>Rok: ${fmtDate(y.period_start)} – ${fmtDate(y.period_end)}</span>
+                    <span class="${y.is_met ? "text-green-600 font-semibold" : "text-gray-500"}">${y.is_met ? "Warunek spełniony" : `brakuje ${fmtAmount(y.remaining)} zł`}</span>
+                </div>
+                <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div class="h-full ${y.is_met ? "bg-green-500" : "bg-primary-solid"}" style="width:${y.percent}%"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">${fmtAmount(y.total_amount)} / ${fmtAmount(y.target)} zł (${y.percent}%)</div>
+            </button>` : "";
 
         return `
         <div class="bg-surface rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -2983,6 +2998,7 @@ function renderCardsStats(stats) {
                     </button>
                 </div>
             </div>
+            ${yearBar}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -3010,16 +3026,24 @@ function buildRulesDescription(card) {
     return `Bezpłatna gdy: ${parts.join(` ${logic} `)}`;
 }
 
+function fmtDate(iso) {
+    return new Date(iso + "T00:00:00").toLocaleDateString("pl-PL");
+}
+
 function fmtAmount(v) {
     return Number(v).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-async function openCardExpenses(cardId, year, month, title) {
+function openCardPeriodExpenses(cardId, from, to, title) {
+    return openCardExpenses(cardId, 0, 0, title, `date_from=${from}&date_to=${to}`);
+}
+
+async function openCardExpenses(cardId, year, month, title, query = `year=${year}&month=${month}`) {
     document.getElementById("card-expenses-title").textContent = title;
     document.getElementById("card-expenses-list").innerHTML = `<p class="text-gray-400 text-sm text-center py-4">Ładowanie...</p>`;
     document.getElementById("card-expenses-modal").classList.remove("hidden");
     try {
-        const expenses = await apiRequest("GET", `/cards/${cardId}/expenses?year=${year}&month=${month}`);
+        const expenses = await apiRequest("GET", `/cards/${cardId}/expenses?${query}`);
         const list = document.getElementById("card-expenses-list");
         if (!expenses.length) {
             list.innerHTML = `<p class="text-gray-400 text-sm text-center py-4">Brak wydatków w tym miesiącu</p>`;
@@ -3049,6 +3073,8 @@ function openAddCardModal() {
     document.getElementById("card-modal-min-tx").value = "";
     document.getElementById("card-modal-min-amt").value = "";
     document.getElementById("card-modal-rules-logic").value = "true";
+    document.getElementById("card-modal-year-amt").value = "";
+    document.getElementById("card-modal-issued").value = "";
     document.getElementById("card-modal-title").textContent = "Dodaj kartę płatniczą";
     document.getElementById("card-modal-rules-row").classList.add("hidden");
     document.getElementById("card-modal").classList.remove("hidden");
@@ -3064,6 +3090,8 @@ async function openEditCardModal(cardId) {
         document.getElementById("card-modal-min-tx").value = card.min_transactions ?? "";
         document.getElementById("card-modal-min-amt").value = card.min_amount ?? "";
         document.getElementById("card-modal-rules-logic").value = card.rules_require_all ? "true" : "false";
+        document.getElementById("card-modal-year-amt").value = card.yearly_min_amount ?? "";
+        document.getElementById("card-modal-issued").value = card.issued_date || "";
         document.getElementById("card-modal-title").textContent = "Edytuj kartę";
         document.getElementById("card-modal").classList.remove("hidden");
         _updateRulesRowVisibility();
@@ -3112,6 +3140,9 @@ async function saveCard() {
         min_transactions: minTx ? parseInt(minTx) : null,
         min_amount: minAmt ? parseFloat(minAmt) : null,
         rules_require_all: requireAll,
+        yearly_min_amount: document.getElementById("card-modal-year-amt").value
+            ? parseFloat(document.getElementById("card-modal-year-amt").value) : null,
+        issued_date: document.getElementById("card-modal-issued").value || null,
     };
 
     try {

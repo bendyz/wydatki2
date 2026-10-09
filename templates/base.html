@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Wydatki 2.0 - AI Expense Manager{% endblock %}</title>
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <!-- Wybór motywu MUSI być ustawiony przed pierwszym paintem, inaczej przy
          jasnym motywie mignie ciemne tło (i odwrotnie). Stąd blokujący skrypt
@@ -155,7 +155,7 @@
     <aside id="navbar" class="is-hidden hidden md:flex fixed inset-y-0 left-0 z-30 w-60 flex-col bg-surface border-r border-gray-200">
         <div class="flex items-center gap-2.5 h-14 px-4 border-b border-gray-200">
             <i class="fas fa-wallet text-primary text-xl"></i>
-            <span class="font-bold text-lg text-gray-900 tracking-tight">Wydatki 2.0</span>
+            <span class="font-bold text-lg text-gray-900 tracking-tight" id="brand-name">{{ app_name }}</span>
         </div>
         <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
             {% for item in visible_nav %}

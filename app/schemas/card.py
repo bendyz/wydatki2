@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,6 +10,8 @@ class PaymentCardBase(BaseModel):
     min_transactions: Optional[int] = Field(None, ge=1, description="Min. liczba transakcji/miesiąc do bezpłatnej karty")
     min_amount: Optional[float] = Field(None, gt=0, description="Min. kwota zł/miesiąc do bezpłatnej karty")
     rules_require_all: bool = Field(True, description="True=wszystkie warunki (AND), False=dowolny warunek (OR)")
+    yearly_min_amount: Optional[float] = Field(None, gt=0, description="Min. kwota zł w roku (od rocznicy wydania karty)")
+    issued_date: Optional[date] = Field(None, description="Data wydania karty; od jej rocznicy liczy się rok")
 
 
 class PaymentCardCreate(PaymentCardBase):
@@ -21,6 +24,8 @@ class PaymentCardUpdate(BaseModel):
     min_transactions: Optional[int] = Field(None, ge=1)
     min_amount: Optional[float] = Field(None, gt=0)
     rules_require_all: Optional[bool] = None
+    yearly_min_amount: Optional[float] = Field(None, gt=0)
+    issued_date: Optional[date] = None
 
 
 class PaymentCardResponse(PaymentCardBase):
@@ -41,6 +46,16 @@ class CardMonthStats(BaseModel):
     is_free: bool
 
 
+class CardYearStats(BaseModel):
+    period_start: date
+    period_end: date
+    total_amount: float
+    target: float
+    remaining: float
+    percent: float
+    is_met: bool
+
+
 class CardStatsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,4 +65,7 @@ class CardStatsResponse(BaseModel):
     min_transactions: Optional[int]
     min_amount: Optional[float]
     rules_require_all: bool
+    yearly_min_amount: Optional[float] = None
+    issued_date: Optional[date] = None
+    year: Optional[CardYearStats] = None
     months: List[CardMonthStats]

@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import Expense, PaymentCard
-from app.schemas.card import CardMonthStats, CardStatsResponse, PaymentCardCreate, PaymentCardUpdate
+from app.schemas.card import CardMonthStats, CardYearStats, CardStatsResponse, PaymentCardCreate, PaymentCardUpdate
 
 POLISH_MONTHS = [
     "", "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -75,6 +75,41 @@ def _compute_is_free(card: PaymentCard, count: int, amount: float) -> tuple[bool
     return bool(is_free), met_tx, met_amt
 
 
+def _anniversary(issued: date, year: int) -> date:
+    try:
+        return issued.replace(year=year)
+    except ValueError:  # 29 lutego w roku nieprzestępnym
+        return date(year, 2, 28)
+
+
+def _year_stats(db: Session, card: PaymentCard, user_id: int) -> Optional[CardYearStats]:
+    if card.yearly_min_amount is None:
+        return None
+    today = date.today()
+    if card.issued_date:
+        start = _anniversary(card.issued_date, today.year)
+        if start > today:
+            start = _anniversary(card.issued_date, today.year - 1)
+        end = _anniversary(card.issued_date, start.year + 1)  # wyłącznie
+    else:
+        start, end = date(today.year, 1, 1), date(today.year + 1, 1, 1)
+    total = float(
+        db.query(func.coalesce(func.sum(Expense.amount), 0))
+        .filter(Expense.card_id == card.id, Expense.user_id == user_id, Expense.date >= start, Expense.date < end)
+        .scalar()
+    )
+    target = card.yearly_min_amount
+    return CardYearStats(
+        period_start=start,
+        period_end=end - timedelta(days=1),
+        total_amount=round(total, 2),
+        target=target,
+        remaining=round(max(target - total, 0), 2),
+        percent=round(min(total / target * 100, 100), 1),
+        is_met=total >= target,
+    )
+
+
 def get_cards_stats(db: Session, user_id: int, num_months: int = 4) -> List[CardStatsResponse]:
     cards = get_cards(db, user_id)
     today = date.today()
@@ -134,15 +169,24 @@ def get_cards_stats(db: Session, user_id: int, num_months: int = 4) -> List[Card
             min_transactions=card.min_transactions,
             min_amount=card.min_amount,
             rules_require_all=card.rules_require_all,
+            yearly_min_amount=card.yearly_min_amount,
+            issued_date=card.issued_date,
+            year=_year_stats(db, card, user_id),
             months=month_stats,
         ))
 
     return result
 
 
-def get_card_expenses(db: Session, card_id: int, user_id: int, year: int, month: int) -> List[Expense]:
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+def get_card_expenses(
+    db: Session, card_id: int, user_id: int, year: int, month: int,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+) -> List[Expense]:
+    if date_from and date_to:  # zakres włącznie, np. okres roczny
+        start, end = date_from, date_to + timedelta(days=1)
+    else:
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
     return (
         db.query(Expense)
         .filter(

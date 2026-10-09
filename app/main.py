@@ -85,4 +85,5 @@ async def root(request: Request):
         "enable_payment_cards": settings.enable_payment_cards,
         "enable_assets": settings.enable_assets,
         "app_version": APP_VERSION,
+        "app_name": settings.app_name,
     })

@@ -3,6 +3,28 @@
 Notatki wydaniowe prowadzone od wersji 0.11.0. Opisują zmiany widoczne dla
 użytkownika — szczegóły techniczne są w historii gita.
 
+## 0.14.0 — 2026-10-09
+
+### Roczny warunek karty
+
+W oknie karty (Karty → edycja) jest nowa sekcja **Warunek roczny**: minimalna
+kwota w roku i data wydania karty. Rok liczy się od rocznicy wydania (bez daty
+— rok kalendarzowy), a nad tabelą miesięczną pojawia się pasek postępu, np.
+„7 340 / 10 000 zł (73%) — brakuje 2 660 zł". Kliknięcie paska pokazuje wszystkie
+wydatki z karty w tym okresie. Warunek roczny jest niezależny od miesięcznych.
+
+### Dla aplikacji Android
+
+Nowe opcjonalne pola karty `yearly_min_amount` i `issued_date`, blok `year`
+w `GET /cards/stats`, a `GET /cards/{id}/expenses` przyjmuje alternatywnie
+`date_from` i `date_to`. Starsze wersje apki działają bez zmian.
+
+## 0.13.1 — 2026-10-09
+
+- „Nazwa aplikacji" z ustawień administratora widnieje teraz w tytule karty
+  przeglądarki i w pasku bocznym (wcześniej służyła tylko w nagłówku zapytań do
+  OpenRouter i w dokumentacji API).
+
 ## 0.13.0 — 2026-10-08
 
 ### Kredyty w module Majątek

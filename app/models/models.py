@@ -28,6 +28,9 @@ class PaymentCard(Base):
     min_transactions = Column(Integer, nullable=True)   # min N transakcji/miesiąc
     min_amount = Column(Float, nullable=True)           # min M zł/miesiąc
     rules_require_all = Column(Boolean, default=True)   # True=AND, False=OR
+    # Roczny próg (rok liczony od rocznicy wydania karty)
+    yearly_min_amount = Column(Float, nullable=True)
+    issued_date = Column(Date, nullable=True)
 
     user = relationship("User", back_populates="payment_cards")
     expenses = relationship("Expense", back_populates="card")

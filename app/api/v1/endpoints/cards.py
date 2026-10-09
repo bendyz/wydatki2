@@ -1,4 +1,5 @@
-from typing import List
+from datetime import date
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -87,12 +88,16 @@ def delete_existing_card(
 )
 def card_expenses(
     card_id: int,
-    year: int = Query(...),
-    month: int = Query(..., ge=1, le=12),
+    year: int = Query(0),
+    month: int = Query(1, ge=1, le=12),
+    date_from: Optional[date] = Query(None, description="Zamiast year/month: początek zakresu (włącznie)"),
+    date_to: Optional[date] = Query(None, description="Zamiast year/month: koniec zakresu (włącznie)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     card = get_card(db, card_id, current_user.id)
     if not card:
         raise HTTPException(status_code=404, detail="Karta nie istnieje")
-    return get_card_expenses(db, card_id, current_user.id, year, month)
+    if not (date_from and date_to) and year < 1:
+        raise HTTPException(status_code=422, detail="Podaj year i month albo date_from i date_to")
+    return get_card_expenses(db, card_id, current_user.id, year, month, date_from, date_to)
