@@ -19,7 +19,7 @@ copy_receipts.sh
 .vscode/
 .idea/
 *.swp
-
+docs/tmp/
 # OS
 .DS_Store
 Thumbs.db
